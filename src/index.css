@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Marine-Axis Admin Panel Design System */
+
+@layer base {
+  :root {
+    /* Ocean-inspired color palette */
+    --background: 220 14% 96%;
+    --foreground: 210 20% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 20% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 20% 20%;
+
+    /* Deep ocean blue primary */
+    --primary: 210 100% 25%;
+    --primary-foreground: 0 0% 98%;
+    --primary-light: 210 100% 40%;
+    --primary-dark: 210 100% 15%;
+
+    /* Sea foam secondary */
+    --secondary: 180 25% 90%;
+    --secondary-foreground: 210 20% 25%;
+
+    /* Subtle wave muted */
+    --muted: 220 14% 96%;
+    --muted-foreground: 210 10% 50%;
+
+    /* Coral accent */
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 98%;
+
+    /* Alert red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Success green */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+
+    /* Warning amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+
+    /* Borders and inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 210 100% 40%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar specific */
+    --sidebar-background: 210 100% 15%;
+    --sidebar-foreground: 210 50% 90%;
+    --sidebar-primary: 210 100% 40%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 210 80% 20%;
+    --sidebar-accent-foreground: 210 50% 90%;
+    --sidebar-border: 210 80% 25%;
+    --sidebar-ring: 210 100% 40%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+    --gradient-ocean: linear-gradient(180deg, hsl(210 100% 95%), hsl(210 100% 90%));
+    --gradient-wave: linear-gradient(90deg, hsl(180 25% 95%), hsl(210 25% 95%));
+
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(210 100% 25% / 0.1);
+    --shadow-medium: 0 4px 16px -4px hsl(210 100% 25% / 0.15);
+    --shadow-strong: 0 8px 32px -8px hsl(210 100% 25% / 0.2);
+
+    /* Animations */
+    --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 210 100% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 210 100% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 210 100% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 100% 60%;
+    --primary-foreground: 210 100% 6%;
+    --primary-light: 210 100% 70%;
+    --primary-dark: 210 100% 40%;
+
+    --secondary: 210 50% 15%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 210 50% 10%;
+    --muted-foreground: 210 20% 65%;
+
+    --accent: 25 95% 58%;
+    --accent-foreground: 210 100% 6%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 210 100% 6%;
+
+    --success: 142 76% 45%;
+    --success-foreground: 210 100% 6%;
+
+    --warning: 38 92% 60%;
+    --warning-foreground: 210 100% 6%;
+
+    --border: 210 50% 20%;
+    --input: 210 50% 20%;
+    --ring: 210 100% 60%;
+
+    --sidebar-background: 210 100% 4%;
+    --sidebar-foreground: 210 40% 95%;
+    --sidebar-primary: 210 100% 60%;
+    --sidebar-primary-foreground: 210 100% 6%;
+    --sidebar-accent: 210 50% 12%;
+    --sidebar-accent-foreground: 210 40% 95%;
+    --sidebar-border: 210 50% 15%;
+    --sidebar-ring: 210 100% 60%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+    --gradient-ocean: linear-gradient(180deg, hsl(210 100% 10%), hsl(210 100% 8%));
+    --gradient-wave: linear-gradient(90deg, hsl(180 25% 10%), hsl(210 25% 10%));
+
+    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
+    --shadow-strong: 0 8px 32px -8px hsl(0 0% 0% / 0.5);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
