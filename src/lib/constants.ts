@@ -1,6 +1,6 @@
 // Constants for Marine-Axis Admin Panel
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://marine-axis-be.onrender.com/api/v1';
 export const JWT_SECRET = import.meta.env.VITE_JWT_SECRET || 'marine-axis-jwt-secret';
 
 export const ROUTES = {
