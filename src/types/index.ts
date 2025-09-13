@@ -4,7 +4,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'provider';
+  role: 'superadmin' | 'admin' | 'provider';
   avatar?: string;
   createdAt: string;
   updatedAt: string;
@@ -250,13 +250,13 @@ export interface CreateUserForm {
   name: string;
   email: string;
   password: string;
-  role: 'super_admin' | 'admin';
+  role: 'superadmin' | 'admin';
 }
 
 export interface UpdateUserForm {
   name?: string;
   email?: string;
-  role?: 'super_admin' | 'admin';
+  role?: 'superadmin' | 'admin';
 }
 
 export interface CreateProviderForm {

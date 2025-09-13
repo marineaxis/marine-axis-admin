@@ -12,8 +12,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => Promise<boolean>;
-  hasRole: (role: Role) => boolean;
-  canAccess: (roles: Role[]) => boolean;
+  hasRole: (role: 'superadmin' | 'admin') => boolean;
+  canAccess: (roles: ('superadmin' | 'admin')[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -141,11 +141,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const hasRole = (role: Role): boolean => {
+  const hasRole = (role: 'superadmin' | 'admin'): boolean => {
     return AuthManager.hasRole(role);
   };
 
-  const canAccess = (roles: Role[]): boolean => {
+  const canAccess = (roles: ('superadmin' | 'admin')[]): boolean => {
     return AuthManager.canAccess(roles);
   };
 

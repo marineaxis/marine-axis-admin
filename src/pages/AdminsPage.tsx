@@ -32,7 +32,7 @@ const MOCK_ADMINS: User[] = [
     id: '2',
     name: 'Super Admin',
     email: 'superadmin@marine-axis.com',
-    role: 'super_admin',
+    role: 'superadmin',
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     lastLogin: '2024-01-25T08:15:00Z',
@@ -127,9 +127,9 @@ export function AdminsPage() {
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setAdmins(prev => prev.map(admin => 
-        admin.id === editingAdmin.id 
-          ? { ...admin, name: editForm.name.trim(), email: editForm.email.trim(), role: editForm.role as 'admin' | 'super_admin', updatedAt: new Date().toISOString() }
+      setAdmins(prev => prev.map(admin =>
+        admin.id === editingAdmin.id
+          ? { ...admin, name: editForm.name.trim(), email: editForm.email.trim(), role: editForm.role as 'admin' | 'superadmin', updatedAt: new Date().toISOString() }
           : admin
       ));
       
@@ -162,7 +162,7 @@ export function AdminsPage() {
   };
 
   const getRoleBadge = (role: string) => {
-    if (role === 'super_admin') {
+    if (role === 'superadmin') {
       return (
         <Badge variant="default" className="gap-1">
           <ShieldCheck className="h-3 w-3" />
@@ -179,7 +179,7 @@ export function AdminsPage() {
   };
 
   // Only super admins can access this page
-  if (!hasRole('super_admin')) {
+  if (!hasRole('superadmin')) {
     return (
       <div className="space-y-6">
         <div>
@@ -357,7 +357,7 @@ export function AdminsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="superadmin">Super Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>

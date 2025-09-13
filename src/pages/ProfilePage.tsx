@@ -116,7 +116,7 @@ export function ProfilePage() {
   };
 
   const getRoleBadge = (role: string) => {
-    if (role === 'super_admin') {
+    if (role === 'superadmin') {
       return (
         <Badge variant="default" className="gap-1">
           <ShieldCheck className="h-3 w-3" />

@@ -44,7 +44,7 @@ const navigationItems = [
   {
     title: 'Dashboard',
     url: ROUTES.DASHBOARD,
-    icon: LayoutDashboard,
+    roles: ['superadmin', 'admin'],
     roles: ['super_admin', 'admin'],
   },
   {
@@ -67,7 +67,7 @@ const navigationItems = [
   {
     title: 'Provider Management',
     icon: Building2,
-    roles: ['super_admin', 'admin'],
+    roles: ['superadmin', 'admin'],
     children: [
       {
         title: 'All Providers',
@@ -84,7 +84,7 @@ const navigationItems = [
   {
     title: 'Job Management',
     icon: Briefcase,
-    roles: ['super_admin', 'admin'],
+    roles: ['superadmin', 'admin'],
     children: [
       {
         title: 'All Jobs',
@@ -101,19 +101,19 @@ const navigationItems = [
   {
     title: 'Categories',
     url: ROUTES.CATEGORIES,
-    icon: Tags,
-    roles: ['super_admin', 'admin'],
+    icon: Tags, // Assuming Tags is a Lucide icon
+    roles: ['superadmin', 'admin'],
   },
   {
     title: 'Blog Management',
     icon: FileText,
-    roles: ['super_admin', 'admin'],
+    roles: ['superadmin', 'admin'],
     children: [
       {
         title: 'All Blogs',
         url: ROUTES.BLOGS,
         icon: FileText,
-      },
+      }, // Assuming FileText is a Lucide icon
       {
         title: 'Create Blog',
         url: ROUTES.BLOG_CREATE,
@@ -124,20 +124,20 @@ const navigationItems = [
   {
     title: 'Approvals',
     url: ROUTES.APPROVALS,
-    icon: CheckSquare,
-    roles: ['super_admin', 'admin'],
+    icon: CheckSquare, // Assuming CheckSquare is a Lucide icon
+    roles: ['superadmin', 'admin'],
   },
   {
     title: 'Email Templates',
     url: ROUTES.EMAIL_TEMPLATES,
-    icon: Mail,
-    roles: ['super_admin', 'admin'],
+    icon: Mail, // Assuming Mail is a Lucide icon
+    roles: ['superadmin', 'admin'],
   },
   {
     title: 'Analytics',
     url: ROUTES.ANALYTICS,
-    icon: BarChart3,
-    roles: ['super_admin', 'admin'],
+    icon: BarChart3, // Assuming BarChart3 is a Lucide icon
+    roles: ['superadmin', 'admin'],
   },
   {
     title: 'Settings',

@@ -345,7 +345,7 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                Security Configuration
+                Security Configuration (Super Admin Only)
               </CardTitle>
               <CardDescription>
                 Configure security policies and authentication settings

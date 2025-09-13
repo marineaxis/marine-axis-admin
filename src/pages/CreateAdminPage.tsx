@@ -22,7 +22,7 @@ export function CreateAdminPage() {
     name: '',
     email: '',
     password: '',
-    role: 'admin',
+    role: 'admin', // Default role
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -250,7 +250,7 @@ export function CreateAdminPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="superadmin">Super Admin</SelectItem>
                 </SelectContent>
               </Select>
               {errors.role && (

@@ -226,8 +226,8 @@ export function AppHeader() {
                   <p className="text-xs leading-none text-muted-foreground">
                     {user?.email}
                   </p>
-                  <Badge variant="secondary" className="w-fit text-xs">
-                    {user?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                  <Badge variant="secondary" className="w-fit text-xs capitalize">
+                    {user?.role === 'superadmin' ? 'Super Admin' : user?.role}
                   </Badge>
                 </div>
               </DropdownMenuLabel>

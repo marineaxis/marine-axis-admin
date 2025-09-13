@@ -63,7 +63,7 @@ export const ROUTES = {
 } as const;
 
 export const ROLES = {
-  SUPER_ADMIN: 'super_admin',
+  SUPER_ADMIN: 'superadmin',
   ADMIN: 'admin',
 } as const;
 

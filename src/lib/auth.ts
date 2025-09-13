@@ -3,7 +3,7 @@ import { jwtDecode } from 'jwt-decode';
 import { LOCAL_STORAGE_KEYS } from './constants';
 import { User, Role } from '../types';
 
-interface JWTPayload {
+export interface JWTPayload {
   sub: string;
   email: string;
   role: Role;
@@ -71,7 +71,7 @@ export class AuthManager {
     return token?.role || null;
   }
 
-  static hasRole(requiredRole: Role): boolean {
+  static hasRole(requiredRole: 'superadmin' | 'admin'): boolean {
     const userRole = this.getUserRole();
     if (!userRole) return false;
 
@@ -82,7 +82,7 @@ export class AuthManager {
     return userRole === requiredRole;
   }
 
-  static canAccess(requiredRoles: Role[]): boolean {
+  static canAccess(requiredRoles: ('superadmin' | 'admin')[]): boolean {
     const userRole = this.getUserRole();
     if (!userRole) return false;
 
@@ -211,43 +211,43 @@ export const sanitize = {
 // RBAC helper functions
 export const permissions = {
   // Admin management
-  canManageAdmins: (): boolean => AuthManager.hasRole('super_admin'),
-  canCreateAdmins: (): boolean => AuthManager.hasRole('super_admin'),
-  canDeleteAdmins: (): boolean => AuthManager.hasRole('super_admin'),
+  canManageAdmins: (): boolean => AuthManager.hasRole('superadmin'),
+  canCreateAdmins: (): boolean => AuthManager.hasRole('superadmin'),
+  canDeleteAdmins: (): boolean => AuthManager.hasRole('superadmin'),
 
   // Provider management
-  canManageProviders: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
-  canApproveProviders: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
-  canDeleteProviders: (): boolean => AuthManager.hasRole('super_admin'),
+  canManageProviders: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canApproveProviders: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canDeleteProviders: (): boolean => AuthManager.hasRole('superadmin'),
 
   // Job management
-  canManageJobs: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
-  canDeleteJobs: (): boolean => AuthManager.hasRole('super_admin'),
+  canManageJobs: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canDeleteJobs: (): boolean => AuthManager.hasRole('superadmin'),
 
   // Blog management
-  canManageBlogs: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
-  canDeleteBlogs: (): boolean => AuthManager.hasRole('super_admin'),
+  canManageBlogs: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canDeleteBlogs: (): boolean => AuthManager.hasRole('superadmin'),
 
   // Category management
-  canManageCategories: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
-  canDeleteCategories: (): boolean => AuthManager.hasRole('super_admin'),
+  canManageCategories: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canDeleteCategories: (): boolean => AuthManager.hasRole('superadmin'),
 
   // Approval management
-  canManageApprovals: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
+  canManageApprovals: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
 
   // Email templates
-  canManageEmailTemplates: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
+  canManageEmailTemplates: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
 
   // Settings
-  canManageSettings: (): boolean => AuthManager.hasRole('super_admin'),
-  canViewSettings: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
+  canManageSettings: (): boolean => AuthManager.hasRole('superadmin'),
+  canViewSettings: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
 
   // Analytics
-  canViewAnalytics: (): boolean => AuthManager.canAccess(['super_admin', 'admin']),
-  canExportData: (): boolean => AuthManager.hasRole('super_admin'),
+  canViewAnalytics: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canExportData: (): boolean => AuthManager.hasRole('superadmin'),
 
   // Audit logs
-  canViewAuditLogs: (): boolean => AuthManager.hasRole('super_admin'),
+  canViewAuditLogs: (): boolean => AuthManager.hasRole('superadmin'),
 };
 
 export default AuthManager;
