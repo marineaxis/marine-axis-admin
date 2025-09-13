@@ -12,100 +12,96 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 
 import { User } from '../types';
 import { useAuth } from '../context/AuthContext';
-
-// Mock admin data - in real app this would come from API
-const MOCK_ADMINS: User[] = [
-  {
-    id: '1',
-    name: 'Admin User',
-    email: 'admin@marine-axis.com',
-    role: 'admin',
-    createdAt: '2024-01-15T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-    lastLogin: '2024-01-25T10:30:00Z',
-  },
-  {
-    id: '2',
-    name: 'Super Admin',
-    email: 'superadmin@marine-axis.com',
-    role: 'superadmin',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    lastLogin: '2024-01-25T08:15:00Z',
-  },
-  {
-    id: '3',
-    name: 'John Smith',
-    email: 'john.smith@marine-axis.com',
-    role: 'admin',
-    createdAt: '2024-01-20T00:00:00Z',
-    updatedAt: '2024-01-22T00:00:00Z',
-    lastLogin: '2024-01-24T14:20:00Z',
-  },
-];
+import useCRUD from '../hooks/useCRUD';
+import api from '../lib/api';
 
 export function AdminsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, hasRole } = useAuth();
   
-  const [admins, setAdmins] = useState<User[]>(MOCK_ADMINS);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', email: '', role: 'admin' });
+  const [editForm, setEditForm] = useState({ name: '', email: '', role: 'admin', isActive: true });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
+  // Use CRUD hook for admin management
+  const {
+    items: admins,
+    loading,
+    deleting,
+    updating,
+    fetchItems,
+    updateItem,
+    deleteItem,
+    setFilters,
+  } = useCRUD<User>({
+    resource: 'admins',
+    api: api.admins,
+    messages: {
+      updated: 'Admin updated successfully',
+      deleted: 'Admin deleted successfully',
+    },
+  });
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  // Apply filters when search or filter values change
+  useEffect(() => {
+    const filters: any = {};
+    
+    if (searchQuery.trim()) {
+      filters.search = searchQuery.trim();
+    }
+    
+    if (roleFilter !== 'all') {
+      filters.role = roleFilter;
+    }
+    
+    if (statusFilter !== 'all') {
+      filters.isActive = statusFilter === 'active';
+    }
+    
+    setFilters(filters);
+  }, [searchQuery, roleFilter, statusFilter, setFilters]);
+
   // Filter admins based on search query
-  const filteredAdmins = admins.filter(admin =>
-    admin.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    admin.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAdmins = admins;
 
   const handleDeleteAdmin = async (adminId: string) => {
-    setIsLoading(true);
+    const adminToDelete = admins.find(a => a.id === adminId);
     
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const adminToDelete = admins.find(a => a.id === adminId);
-      
-      // Prevent deleting self
-      if (adminToDelete?.email === user?.email) {
-        toast({
-          title: 'Cannot delete yourself',
-          description: 'You cannot delete your own admin account',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setAdmins(prev => prev.filter(admin => admin.id !== adminId));
-      
+    // Prevent deleting self
+    if (adminToDelete?.email === user?.email) {
       toast({
-        title: 'Admin deleted',
-        description: `${adminToDelete?.name} has been removed from the system`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete admin. Please try again.',
+        title: 'Cannot delete yourself',
+        description: 'You cannot delete your own admin account',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
+      return;
     }
+
+    await deleteItem(adminId);
   };
 
   const handleEditAdmin = (admin: User) => {
     setEditingAdmin(admin);
-    setEditForm({ name: admin.name, email: admin.email, role: admin.role });
+    setEditForm({ 
+      name: admin.name, 
+      email: admin.email, 
+      role: admin.role,
+      isActive: admin.isActive ?? true 
+    });
     setEditErrors({});
     setIsEditDialogOpen(true);
   };
@@ -123,31 +119,18 @@ export function AdminsPage() {
   const handleUpdateAdmin = async () => {
     if (!validateEditForm() || !editingAdmin) return;
 
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setAdmins(prev => prev.map(admin =>
-        admin.id === editingAdmin.id
-          ? { ...admin, name: editForm.name.trim(), email: editForm.email.trim(), role: editForm.role as 'admin' | 'superadmin', updatedAt: new Date().toISOString() }
-          : admin
-      ));
-      
-      toast({
-        title: 'Admin updated',
-        description: `${editForm.name} has been updated successfully`,
-      });
-      
+    const updateData = {
+      name: editForm.name.trim(),
+      email: editForm.email.trim(),
+      role: editForm.role,
+      isActive: editForm.isActive,
+    };
+
+    const result = await updateItem(editingAdmin.id, updateData);
+    
+    if (result) {
       setIsEditDialogOpen(false);
       setEditingAdmin(null);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update admin. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -178,6 +161,13 @@ export function AdminsPage() {
     );
   };
 
+  const getStatusBadge = (isActive?: boolean) => {
+    return isActive ? (
+      <Badge variant="default">Active</Badge>
+    ) : (
+      <Badge variant="secondary">Inactive</Badge>
+    );
+  };
   // Only super admins can access this page
   if (!hasRole('superadmin')) {
     return (
@@ -190,6 +180,27 @@ export function AdminsPage() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Admins</h1>
+            <p className="text-muted-foreground">Manage admin users and their permissions</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 bg-muted rounded animate-pulse" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -223,6 +234,26 @@ export function AdminsPage() {
                 className="pl-9"
               />
             </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="superadmin">Super Admin</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
             <div className="text-sm text-muted-foreground">
               {filteredAdmins.length} of {admins.length} admins
             </div>
@@ -236,6 +267,7 @@ export function AdminsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Last Login</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -244,7 +276,7 @@ export function AdminsPage() {
               <TableBody>
                 {filteredAdmins.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       <div className="text-muted-foreground">
                         {searchQuery ? 'No admins found matching your search' : 'No admins found'}
                       </div>
@@ -256,6 +288,7 @@ export function AdminsPage() {
                       <TableCell className="font-medium">{admin.name}</TableCell>
                       <TableCell>{admin.email}</TableCell>
                       <TableCell>{getRoleBadge(admin.role)}</TableCell>
+                      <TableCell>{getStatusBadge(admin.isActive)}</TableCell>
                       <TableCell>
                         {admin.lastLogin ? formatDate(admin.lastLogin) : 'Never'}
                       </TableCell>
@@ -297,7 +330,7 @@ export function AdminsPage() {
                                   <AlertDialogAction
                                     onClick={() => handleDeleteAdmin(admin.id)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    disabled={isLoading}
+                                    disabled={deleting}
                                   >
                                     Delete Admin
                                   </AlertDialogAction>
@@ -361,12 +394,21 @@ export function AdminsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="edit-active"
+                checked={editForm.isActive}
+                onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, isActive: checked }))}
+              />
+              <Label htmlFor="edit-active">Active</Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateAdmin} disabled={isLoading}>
+            <Button onClick={handleUpdateAdmin} disabled={updating}>
               Update Admin
             </Button>
           </DialogFooter>

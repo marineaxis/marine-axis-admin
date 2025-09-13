@@ -6,6 +6,7 @@ export interface User {
   name: string;
   role: 'superadmin' | 'admin' | 'provider';
   avatar?: string;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
   lastLogin?: string;

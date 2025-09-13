@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { CreateUserForm, Role } from '../types';
 import { passwordValidation, sanitize } from '../lib/auth';
+import api from '../lib/api';
 
 export function CreateAdminPage() {
   const navigate = useNavigate();
@@ -79,29 +80,33 @@ export function CreateAdminPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call to create admin
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       // Sanitize input data
       const sanitizedData = {
         ...formData,
         name: formData.name.trim(),
         email: sanitize.email(formData.email),
+        isActive: true, // New admins are active by default
       };
 
-      // In a real app, this would be: await api.admins.create(sanitizedData);
-      console.log('Creating admin:', sanitizedData);
+      const response = await api.admins.create(sanitizedData);
 
-      toast({
-        title: 'Admin created successfully',
-        description: `${sanitizedData.name} has been added as an admin`,
-      });
-
-      navigate('/admins');
+      if (response.success) {
+        toast({
+          title: 'Admin created successfully',
+          description: `${sanitizedData.name} has been added as an admin`,
+        });
+        navigate('/admins');
+      } else {
+        toast({
+          title: 'Error creating admin',
+          description: response.message || 'Please try again later',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
       toast({
         title: 'Error creating admin',
-        description: 'Please try again later',
+        description: error.message || 'Please try again later',
         variant: 'destructive',
       });
     } finally {

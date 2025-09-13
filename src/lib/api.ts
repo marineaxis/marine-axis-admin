@@ -215,8 +215,8 @@ class ApiClient {
       return this.delete(`/admins/${id}`);
     },
 
-    toggleStatus: async (id: string) => {
-      return this.patch(`/admins/${id}/status`);
+    stats: async () => {
+      return this.get('/admins/stats');
     },
   };
 
