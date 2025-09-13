@@ -242,12 +242,27 @@ class ApiClient {
       return this.delete(`/providers/${id}`);
     },
 
+    getFeatured: async (params?: any) => {
+      return this.get('/providers/featured', params);
+    },
+
+    getPending: async (params?: any) => {
+      return this.get('/providers/pending', params);
+    },
+
+    getStats: async () => {
+      return this.get('/providers/stats');
+    },
     approve: async (id: string) => {
       return this.patch(`/providers/${id}/approve`);
     },
 
     reject: async (id: string, reason: string) => {
-      return this.patch(`/providers/${id}/reject`, { reason });
+      return this.patch(`/providers/${id}/reject`, { rejectionReason: reason });
+    },
+
+    reapply: async (id: string, data: any) => {
+      return this.patch(`/providers/${id}/reapply`, data);
     },
 
     toggleFeatured: async (id: string) => {

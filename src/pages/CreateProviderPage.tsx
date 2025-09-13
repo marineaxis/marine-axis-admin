@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 
 import { CreateProviderForm } from '../types';
 import { sanitize } from '../lib/auth';
+import useCRUD from '../hooks/useCRUD';
+import api from '../lib/api';
 
 // Mock categories for selection
 const MOCK_CATEGORIES = [
@@ -27,7 +29,6 @@ export function CreateProviderPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<CreateProviderForm>({
     name: '',
     email: '',
@@ -48,6 +49,15 @@ export function CreateProviderPage() {
 
   const [currentService, setCurrentService] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Use CRUD hook for provider creation
+  const { createItem, creating } = useCRUD<any>({
+    resource: 'providers',
+    api: api.providers,
+    messages: {
+      created: 'Provider created successfully and is pending approval',
+    },
+  });
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -155,37 +165,33 @@ export function CreateProviderPage() {
       return;
     }
 
-    setIsLoading(true);
+    // Sanitize data
+    const sanitizedData = {
+      companyName: formData.name.trim(),
+      contactName: formData.name.trim(), // Using same name for contact
+      email: sanitize.email(formData.email),
+      phone: sanitize.phone(formData.phone),
+      description: formData.description.trim(),
+      address: {
+        street: '',
+        city: formData.location.split(',')[0]?.trim() || '',
+        state: formData.location.split(',')[1]?.trim() || '',
+        country: 'USA',
+        zipCode: ''
+      },
+      location: {
+        coordinates: [0, 0] // Default coordinates
+      },
+      website: formData.website ? sanitize.url(formData.website) : undefined,
+      services: formData.services,
+      categoryIds: formData.categoryIds,
+      socialLinks: formData.socialLinks,
+    };
 
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Sanitize data
-      const sanitizedData = {
-        ...formData,
-        name: formData.name.trim(),
-        email: sanitize.email(formData.email),
-        phone: sanitize.phone(formData.phone),
-        website: formData.website ? sanitize.url(formData.website) : undefined,
-      };
-
-      console.log('Creating provider:', sanitizedData);
-
-      toast({
-        title: 'Provider created successfully',
-        description: `${sanitizedData.name} has been added and is pending approval`,
-      });
-
+    const result = await createItem(sanitizedData);
+    
+    if (result) {
       navigate('/providers');
-    } catch (error) {
-      toast({
-        title: 'Error creating provider',
-        description: 'Please try again later',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -475,15 +481,15 @@ export function CreateProviderPage() {
 
         {/* Submit Buttons */}
         <div className="flex items-center gap-4">
-          <Button type="submit" disabled={isLoading} className="min-w-32">
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="submit" disabled={creating} className="min-w-32">
+            {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Provider
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => navigate('/providers')}
-            disabled={isLoading}
+            disabled={creating}
           >
             Cancel
           </Button>

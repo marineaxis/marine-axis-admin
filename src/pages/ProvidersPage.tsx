@@ -16,82 +16,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 
 import { Provider } from '../types';
-
-// Mock provider data
-const MOCK_PROVIDERS: Provider[] = [
-  {
-    id: '1',
-    name: 'Marine Solutions Ltd',
-    email: 'contact@marinesolutions.com',
-    phone: '+1-555-0101',
-    location: 'Miami, FL',
-    description: 'Full-service marine equipment supplier and maintenance provider.',
-    services: ['Equipment Supply', 'Maintenance', 'Repair'],
-    categoryIds: ['1', '2'],
-    status: 'approved',
-    featured: true,
-    logo: undefined,
-    images: [],
-    website: 'https://marinesolutions.com',
-    socialLinks: { linkedin: 'marinesolutions' },
-    verificationDocuments: [],
-    rating: 4.8,
-    reviewCount: 124,
-    createdAt: '2024-01-15T00:00:00Z',
-    updatedAt: '2024-01-20T00:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Ocean Tech Services',
-    email: 'info@oceantech.com',
-    phone: '+1-555-0202',
-    location: 'San Diego, CA',
-    description: 'Specialized in marine electronics and navigation systems.',
-    services: ['Electronics', 'Navigation', 'Installation'],
-    categoryIds: ['3'],
-    status: 'pending',
-    featured: false,
-    logo: undefined,
-    images: [],
-    website: 'https://oceantech.com',
-    socialLinks: {},
-    verificationDocuments: [],
-    rating: 4.5,
-    reviewCount: 89,
-    createdAt: '2024-01-18T00:00:00Z',
-    updatedAt: '2024-01-18T00:00:00Z',
-  },
-  {
-    id: '3',
-    name: 'Coastal Marine Works',
-    email: 'hello@coastalmarine.com',
-    phone: '+1-555-0303',
-    location: 'Boston, MA',
-    description: 'Expert boat repair and restoration services.',
-    services: ['Repair', 'Restoration', 'Painting'],
-    categoryIds: ['1', '4'],
-    status: 'approved',
-    featured: false,
-    logo: undefined,
-    images: [],
-    website: undefined,
-    socialLinks: {},
-    verificationDocuments: [],
-    rating: 4.2,
-    reviewCount: 56,
-    createdAt: '2024-01-10T00:00:00Z',
-    updatedAt: '2024-01-22T00:00:00Z',
-  },
-];
+import useCRUD from '../hooks/useCRUD';
+import api from '../lib/api';
 
 export function ProvidersPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [providers, setProviders] = useState<Provider[]>(MOCK_PROVIDERS);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(false);
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
@@ -100,124 +33,112 @@ export function ProvidersPage() {
   });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
-  // Filter providers
-  const filteredProviders = providers.filter(provider => {
-    const matchesSearch = 
-      provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      provider.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      provider.location.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || provider.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+  // Use CRUD hook for provider management
+  const {
+    items: providers,
+    loading,
+    updating,
+    deleting,
+    fetchItems,
+    updateItem,
+    deleteItem,
+    setFilters,
+  } = useCRUD<Provider>({
+    resource: 'providers',
+    api: api.providers,
+    messages: {
+      updated: 'Provider updated successfully',
+      deleted: 'Provider deleted successfully',
+    },
   });
 
+  // Fetch providers on component mount
+  React.useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  // Apply filters when search or filter values change
+  React.useEffect(() => {
+    const filters: any = {};
+    
+    if (searchQuery.trim()) {
+      filters.search = searchQuery.trim();
+    }
+    
+    if (statusFilter !== 'all') {
+      filters.status = statusFilter;
+    }
+    
+    setFilters(filters);
+  }, [searchQuery, statusFilter, setFilters]);
+
+  // Filter providers
+  const filteredProviders = providers;
+
   const handleApprove = async (providerId: string) => {
-    setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await api.providers.approve(providerId);
       
-      setProviders(prev => 
-        prev.map(provider => 
-          provider.id === providerId 
-            ? { ...provider, status: 'approved' as const, updatedAt: new Date().toISOString() }
-            : provider
-        )
-      );
-      
-      toast({
-        title: 'Provider approved',
-        description: 'Provider has been approved successfully',
-      });
+      if (response.success) {
+        toast({
+          title: 'Provider approved',
+          description: 'Provider has been approved successfully',
+        });
+        await fetchItems(); // Refresh the list
+      }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to approve provider',
+        description: error.message || 'Failed to approve provider',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleReject = async (providerId: string) => {
-    setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const reason = 'Provider application does not meet requirements';
+      const response = await api.providers.reject(providerId, reason);
       
-      setProviders(prev => 
-        prev.map(provider => 
-          provider.id === providerId 
-            ? { ...provider, status: 'rejected' as const, updatedAt: new Date().toISOString() }
-            : provider
-        )
-      );
-      
-      toast({
-        title: 'Provider rejected',
-        description: 'Provider has been rejected',
-      });
+      if (response.success) {
+        toast({
+          title: 'Provider rejected',
+          description: 'Provider has been rejected',
+        });
+        await fetchItems(); // Refresh the list
+      }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to reject provider',
+        description: error.message || 'Failed to reject provider',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleToggleFeatured = async (providerId: string) => {
-    setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await api.providers.toggleFeatured(providerId);
       
-      setProviders(prev => 
-        prev.map(provider => 
-          provider.id === providerId 
-            ? { ...provider, featured: !provider.featured, updatedAt: new Date().toISOString() }
-            : provider
-        )
-      );
-      
-      const provider = providers.find(p => p.id === providerId);
-      toast({
-        title: provider?.featured ? 'Removed from featured' : 'Added to featured',
-        description: provider?.featured ? 'Provider is no longer featured' : 'Provider is now featured',
-      });
+      if (response.success) {
+        const provider = providers.find(p => p.id === providerId);
+        toast({
+          title: provider?.featured ? 'Removed from featured' : 'Added to featured',
+          description: provider?.featured ? 'Provider is no longer featured' : 'Provider is now featured',
+        });
+        await fetchItems(); // Refresh the list
+      }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update provider',
+        description: error.message || 'Failed to update provider',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleDelete = async (providerId: string) => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const provider = providers.find(p => p.id === providerId);
-      setProviders(prev => prev.filter(p => p.id !== providerId));
-      
-      toast({
-        title: 'Provider deleted',
-        description: `${provider?.name} has been removed`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete provider',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await deleteItem(providerId);
   };
 
   const handleViewDetails = (provider: Provider) => {
@@ -255,40 +176,21 @@ export function ProvidersPage() {
   const handleUpdateProvider = async () => {
     if (!validateEditForm() || !selectedProvider) return;
 
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setProviders(prev => prev.map(provider => 
-        provider.id === selectedProvider.id 
-          ? { 
-              ...provider, 
-              name: editForm.name.trim(), 
-              email: editForm.email.trim(), 
-              phone: editForm.phone.trim(),
-              location: editForm.location.trim(),
-              description: editForm.description.trim(),
-              website: editForm.website.trim() || undefined,
-              updatedAt: new Date().toISOString() 
-            }
-          : provider
-      ));
-      
-      toast({
-        title: 'Provider updated',
-        description: `${editForm.name} has been updated successfully`,
-      });
+    const updateData = {
+      name: editForm.name.trim(),
+      email: editForm.email.trim(),
+      phone: editForm.phone.trim(),
+      location: editForm.location.trim(),
+      description: editForm.description.trim(),
+      website: editForm.website.trim() || undefined,
+    };
+
+    const result = await updateItem(selectedProvider.id, updateData);
+    
+    if (result) {
       
       setEditDialogOpen(false);
       setSelectedProvider(null);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update provider. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -482,7 +384,7 @@ export function ProvidersPage() {
                                   <AlertDialogAction
                                     onClick={() => handleDelete(provider.id)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    disabled={isLoading}
+                                    disabled={deleting}
                                   >
                                     Delete Provider
                                   </AlertDialogAction>
@@ -640,7 +542,7 @@ export function ProvidersPage() {
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateProvider} disabled={isLoading}>
+            <Button onClick={handleUpdateProvider} disabled={updating}>
               Update Provider
             </Button>
           </DialogFooter>
