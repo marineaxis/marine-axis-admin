@@ -317,7 +317,7 @@ export interface CreateCategoryForm {
 }
 
 // Utility types
-export type Role = 'super_admin' | 'admin';
+export type Role = 'superadmin' | 'admin';
 export type Status = 'active' | 'inactive' | 'pending' | 'suspended';
 export type SortOrder = 'asc' | 'desc';
 
