@@ -247,6 +247,10 @@ export function AppHeader() {
                 <LogOut className="mr-2 h-4 w-4" />
                 Log out
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogoutAll} className="text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out all sessions
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

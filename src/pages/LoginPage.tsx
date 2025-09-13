@@ -156,12 +156,9 @@ export function LoginPage() {
             </form>
 
             <div className="mt-6 text-center">
-              <Link
-                to="/forgot-password"
-                className="text-sm text-primary hover:underline"
-              >
-                Forgot your password?
-              </Link>
+              <div className="text-sm text-muted-foreground">
+                For password reset, please contact your system administrator
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -170,6 +167,11 @@ export function LoginPage() {
         <div className="text-center text-sm text-muted-foreground">
           <p>Marine-Axis Admin Panel</p>
           <p className="mt-1">Secure access for authorized personnel only</p>
+          <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+            <p className="font-medium mb-1">Demo Credentials</p>
+            <p className="text-xs">Email: admin@marine-axis.com</p>
+            <p className="text-xs">Password: AdminPassword123</p>
+          </div>
         </div>
       </div>
     </div>

@@ -47,9 +47,11 @@ class ApiClient {
               const response = await MockAuthService.refreshToken();
 
               if (response.success) {
-                const { accessToken } = response.data;
+                const { accessToken, refreshToken } = response.data;
                 localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN, accessToken);
-                localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
+                if (refreshToken) {
+                  localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+                }
 
                 originalRequest.headers.Authorization = `Bearer ${accessToken}`;
                 return this.instance(originalRequest);

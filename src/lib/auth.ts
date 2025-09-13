@@ -22,7 +22,9 @@ export class AuthManager {
 
   static setTokens(accessToken: string, refreshToken: string): void {
     localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN, accessToken);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+    if (refreshToken) {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+    }
   }
 
   static clearTokens(): void {

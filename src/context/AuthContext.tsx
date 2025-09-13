@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success) {
         const { user: userData, accessToken, refreshToken } = response.data;
         
-        AuthManager.setTokens(accessToken, refreshToken);
+        AuthManager.setTokens(accessToken, refreshToken || '');
         AuthManager.setUserData(userData);
         setUser(userData);
 
@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         toast({
           title: 'Login failed',
-          description: response.message || 'Invalid credentials',
+          description: response.message || 'Invalid email or password',
           variant: 'destructive',
         });
         return false;
@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error: any) {
       toast({
         title: 'Login error',
-        description: error.message || 'An error occurred during login',
+        description: error.message || 'Network error. Please check your connection.',
         variant: 'destructive',
       });
       return false;

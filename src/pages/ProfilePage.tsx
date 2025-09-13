@@ -85,13 +85,17 @@ export function ProfilePage() {
 
     setIsLoading(true);
     try {
-      // Simulate password change API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await api.auth.changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
       
-      toast({
-        title: 'Password updated',
-        description: 'Your password has been changed successfully',
-      });
+      if (response.success) {
+        toast({
+          title: 'Password updated',
+          description: 'Your password has been changed successfully',
+        });
+      }
 
       setPasswordData({
         currentPassword: '',
@@ -103,7 +107,7 @@ export function ProfilePage() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to change password',
+        description: error.message || 'Failed to change password',
         variant: 'destructive',
       });
     } finally {
