@@ -76,7 +76,7 @@ export class AuthManager {
     if (!userRole) return false;
 
     // Super admin has access to everything
-    if (userRole === 'super_admin') return true;
+    if (userRole === 'superadmin') return true;
     
     // Admin can only access admin-level features
     return userRole === requiredRole;
@@ -87,7 +87,7 @@ export class AuthManager {
     if (!userRole) return false;
 
     // Super admin has access to everything
-    if (userRole === 'super_admin') return true;
+    if (userRole === 'superadmin') return true;
 
     return requiredRoles.includes(userRole);
   }
