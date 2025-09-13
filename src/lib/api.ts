@@ -1,7 +1,6 @@
 // API client for Marine-Axis Admin Panel
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import { API_BASE_URL, LOCAL_STORAGE_KEYS, ERROR_MESSAGES } from './constants';
-import { MockAuthService } from './mockAuth';
 import { ApiResponse, PaginatedResponse } from '../types';
 
 class ApiClient {
@@ -166,34 +165,31 @@ class ApiClient {
   // Authentication methods (using mock service)
   auth = {
     login: async (email: string, password: string) => {
-      return MockAuthService.login(email, password);
+      const response = await this.post('/auth/admin/login', { email, password });
+      return response;
     },
 
     logout: async () => {
-      const response = await MockAuthService.logout();
+      const refreshToken = localStorage.getItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN);
+      const response = await this.post('/auth/logout', { refreshToken });
       this.clearAuth();
       return response;
     },
 
     refreshToken: async (refreshToken: string) => {
-      return MockAuthService.refreshToken();
+      return this.post('/auth/refresh', { refreshToken });
     },
 
     me: async () => {
-      return MockAuthService.me();
+      return this.get('/auth/me');
     },
 
     updateProfile: async (data: any) => {
-      return MockAuthService.updateProfile(data);
+      return this.put('/auth/profile', data);
     },
 
     changePassword: async (currentPassword: string, newPassword: string) => {
-      // Mock implementation - just return success
-      return {
-        success: true,
-        message: 'Password changed successfully',
-        data: null,
-      };
+      return this.post('/auth/change-password', { currentPassword, newPassword });
     },
   };
 
