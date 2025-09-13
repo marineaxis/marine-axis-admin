@@ -45,12 +45,11 @@ const navigationItems = [
     title: 'Dashboard',
     url: ROUTES.DASHBOARD,
     roles: ['superadmin', 'admin'],
-    roles: ['super_admin', 'admin'],
   },
   {
     title: 'Admin Management',
     icon: Shield,
-    roles: ['super_admin'],
+    roles: ['superadmin'],
     children: [
       {
         title: 'All Admins',
@@ -142,7 +141,7 @@ const navigationItems = [
   {
     title: 'Settings',
     icon: Settings,
-    roles: ['super_admin'],
+    roles: ['superadmin'],
     children: [
       {
         title: 'General',
