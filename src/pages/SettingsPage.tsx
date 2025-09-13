@@ -63,7 +63,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [activeTab, setActiveTab] = useState('general');
 
-  const isSuperAdmin = hasRole('super_admin');
+  const isSuperAdmin = hasRole('superadmin');
 
   const handleSettingChange = (category: string, field: string, value: any) => {
     setSettings(prev => ({
