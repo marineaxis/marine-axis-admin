@@ -490,7 +490,7 @@ export function ApprovalsPage() {
               </CardContent>
             </Card>
           ) : (
-          {pendingApprovals.length === 0 ? (
+          pendingApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -501,7 +501,6 @@ export function ApprovalsPage() {
             <div className="grid gap-4">
               {pendingApprovals.map(renderApprovalCard)}
             </div>
-          )}
           )}
         </TabsContent>
 
@@ -514,7 +513,7 @@ export function ApprovalsPage() {
               </CardContent>
             </Card>
           ) : (
-          {approvedApprovals.length === 0 ? (
+          approvedApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Check className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -525,7 +524,6 @@ export function ApprovalsPage() {
             <div className="grid gap-4">
               {approvedApprovals.map(renderApprovalCard)}
             </div>
-          )}
           )}
         </TabsContent>
 
@@ -538,7 +536,7 @@ export function ApprovalsPage() {
               </CardContent>
             </Card>
           ) : (
-          {rejectedApprovals.length === 0 ? (
+          rejectedApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <X className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -549,7 +547,6 @@ export function ApprovalsPage() {
             <div className="grid gap-4">
               {rejectedApprovals.map(renderApprovalCard)}
             </div>
-          )}
           )}
         </TabsContent>
       </Tabs>
