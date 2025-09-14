@@ -346,6 +346,31 @@ class ApiClient {
       return this.getPaginated('/blogs', params);
     },
 
+    // Admin endpoints
+    listAdmin: async (params?: any) => {
+      return this.getPaginated('/blogs/admin', params);
+    },
+
+    // Public endpoints
+    getFeatured: async (params?: any) => {
+      return this.get('/blogs/featured', params);
+    },
+
+    getBySlug: async (slug: string) => {
+      return this.get(`/blogs/slug/${slug}`);
+    },
+
+    getPopularTags: async (params?: any) => {
+      return this.get('/blogs/tags/popular', params);
+    },
+
+    getRelated: async (blogId: string, params?: any) => {
+      return this.get(`/blogs/related/${blogId}`, params);
+    },
+
+    getStats: async () => {
+      return this.get('/blogs/stats');
+    },
     get: async (id: string) => {
       return this.get(`/blogs/${id}`);
     },
@@ -366,12 +391,20 @@ class ApiClient {
       return this.patch(`/blogs/${id}/publish`);
     },
 
-    unpublish: async (id: string) => {
-      return this.patch(`/blogs/${id}/unpublish`);
+    archive: async (id: string) => {
+      return this.patch(`/blogs/${id}/archive`);
     },
 
     toggleFeatured: async (id: string) => {
       return this.patch(`/blogs/${id}/featured`);
+    },
+
+    updateGallery: async (id: string, gallery: any[]) => {
+      return this.patch(`/blogs/${id}/gallery`, { gallery });
+    },
+
+    generateUploadUrl: async (id: string, fileName: string, fileType: string) => {
+      return this.post(`/blogs/${id}/upload-url`, { fileName, fileType });
     },
   };
 
