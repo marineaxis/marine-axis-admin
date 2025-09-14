@@ -57,8 +57,8 @@ export function DashboardPage() {
     try {
       setLoading(true);
       
-      // Fetch analytics data
-      const analyticsResponse = await api.analytics.dashboard();
+      // Fetch admin dashboard data
+      const analyticsResponse = await api.analytics.adminDashboard();
       if (analyticsResponse.success) {
         setAnalytics(analyticsResponse.data);
       }

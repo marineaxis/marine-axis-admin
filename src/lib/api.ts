@@ -423,6 +423,18 @@ class ApiClient {
       return this.get('/analytics/dashboard');
     },
 
+    // Role-specific dashboard endpoints
+    adminDashboard: async () => {
+      return this.get('/dashboard/admin');
+    },
+
+    providerDashboard: async () => {
+      return this.get('/dashboard/provider');
+    },
+
+    customerDashboard: async () => {
+      return this.get('/dashboard/customer');
+    },
     providers: async (params?: any) => {
       return this.get('/analytics/providers', params);
     },

@@ -1,5 +1,6 @@
 // Provider dashboard overview page
 import React from 'react';
+import { useEffect } from 'react';
 import { Plus, TrendingUp, Package, Image, Star } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -7,22 +8,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { useProviderAuth } from '../../context/ProviderAuthContext';
+import { useToast } from '@/hooks/use-toast';
+import api from '../../lib/api';
 
-// Mock data
-const STATS = {
-  totalListings: 12,
-  activeListings: 8,
-  totalViews: 1247,
-  totalInquiries: 34,
-  averageRating: 4.8,
-  totalReviews: 124,
+// Default stats for fallback
+const DEFAULT_STATS = {
+  totalListings: 0,
+  activeListings: 0,
+  totalViews: 0,
+  totalInquiries: 0,
+  averageRating: 0,
+  totalReviews: 0,
 };
 
-const RECENT_ACTIVITY = [
-  { id: 1, type: 'inquiry', message: 'New inquiry for Marine Engine Repair', time: '2 hours ago' },
-  { id: 2, type: 'review', message: 'New 5-star review received', time: '1 day ago' },
-  { id: 3, type: 'listing', message: 'Boat Maintenance listing approved', time: '2 days ago' },
-  { id: 4, type: 'photo', message: 'Photos updated for Electronics Service', time: '3 days ago' },
+const DEFAULT_ACTIVITY = [
+  { id: 1, type: 'info', message: 'Welcome to your provider dashboard', time: 'Just now' },
 ];
 
 const QUICK_ACTIONS = [
@@ -34,6 +34,42 @@ const QUICK_ACTIONS = [
 export function ProviderDashboard() {
   const navigate = useNavigate();
   const { provider } = useProviderAuth();
+  const { toast } = useToast();
+  
+  const [stats, setStats] = React.useState(DEFAULT_STATS);
+  const [recentActivity, setRecentActivity] = React.useState(DEFAULT_ACTIVITY);
+  const [loading, setLoading] = React.useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch provider dashboard data
+      const response = await api.analytics.providerDashboard();
+      
+      if (response.success) {
+        setStats(response.data.stats || DEFAULT_STATS);
+        setRecentActivity(response.data.recentActivity || DEFAULT_ACTIVITY);
+      }
+    } catch (error: any) {
+      console.error('Dashboard data fetch error:', error);
+      // Use default data on error
+      setStats(DEFAULT_STATS);
+      setRecentActivity(DEFAULT_ACTIVITY);
+      
+      toast({
+        title: 'Dashboard Error',
+        description: 'Using offline data. Please check your connection.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -91,12 +127,12 @@ export function ProviderDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Listings</p>
-                <p className="text-2xl font-bold">{STATS.totalListings}</p>
+                <p className="text-2xl font-bold">{stats.totalListings}</p>
               </div>
               <Package className="h-8 w-8 text-muted-foreground" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {STATS.activeListings} active
+              {stats.activeListings} active
             </p>
           </CardContent>
         </Card>
@@ -106,7 +142,7 @@ export function ProviderDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Views</p>
-                <p className="text-2xl font-bold">{STATS.totalViews.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{stats.totalViews.toLocaleString()}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -119,7 +155,7 @@ export function ProviderDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Inquiries</p>
-                <p className="text-2xl font-bold">{STATS.totalInquiries}</p>
+                <p className="text-2xl font-bold">{stats.totalInquiries}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                 <span className="text-sm font-bold text-primary">?</span>
@@ -134,12 +170,12 @@ export function ProviderDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Rating</p>
-                <p className="text-2xl font-bold">{STATS.averageRating}</p>
+                <p className="text-2xl font-bold">{stats.averageRating}</p>
               </div>
               <Star className="h-8 w-8 text-yellow-500 fill-current" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {STATS.totalReviews} reviews
+              {stats.totalReviews} reviews
             </p>
           </CardContent>
         </Card>
@@ -155,7 +191,7 @@ export function ProviderDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {RECENT_ACTIVITY.map((activity) => (
+            {recentActivity.map((activity) => (
               <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                 <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
                 <div className="flex-1">
