@@ -1,0 +1,5 @@
+{
+  "redirects": [
+    { "source": "/(.*)", "destination": "https://admin.marineaxis.in/$1", "permanent": true }
+  ]
+}

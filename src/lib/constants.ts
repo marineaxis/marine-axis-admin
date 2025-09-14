@@ -1,7 +1,30 @@
-// Constants for Marine-Axis Admin Panel
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL?: string;
+  readonly VITE_JWT_SECRET?: string;
+  readonly VITE_FRONTEND_ORIGIN?: string;
+  readonly VITE_FRONTEND_ORIGIN_ADMIN?: string;
+  readonly MODE?: string; // Vite automatically injects this
+}
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://marine-axis-be.onrender.com/api/v1';
+declare global {
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
+
+// Dynamically choose API URL based on env
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.MODE === 'development'
+    ? 'http://localhost:3000/api/v1'
+    : 'https://marine-axis-be.onrender.com/api/v1');
+
+// JWT secret (optional in frontend)
 export const JWT_SECRET = import.meta.env.VITE_JWT_SECRET || 'marine-axis-jwt-secret';
+
+// Frontend origins (for frontend usage, optional)
+export const FRONTEND_ORIGIN = import.meta.env.VITE_FRONTEND_ORIGIN || 'https://marineaxis.in';
+export const FRONTEND_ORIGIN_ADMIN = import.meta.env.VITE_FRONTEND_ORIGIN_ADMIN || 'https://admin.marineaxis.in';
 
 export const ROUTES = {
   // Auth
