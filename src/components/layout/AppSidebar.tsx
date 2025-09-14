@@ -239,7 +239,7 @@ export function AppSidebar() {
                           <SidebarMenuButton 
                             className={getNavClassName(isGroupActive(item.children))}
                           >
-                            <item.icon className="mr-2 h-4 w-4" />
+                            {item.icon && <item.icon className="mr-2 h-4 w-4" />}
                             {!collapsed && (
                               <>
                                 <span className="flex-1">{item.title}</span>
@@ -258,7 +258,7 @@ export function AppSidebar() {
                                       to={child.url} 
                                       className={({ isActive }) => getNavClassName(isActive)}
                                     >
-                                      <child.icon className="mr-2 h-4 w-4" />
+                                      {child.icon && <child.icon className="mr-2 h-4 w-4" />}
                                       <span>{child.title}</span>
                                     </NavLink>
                                   </SidebarMenuSubButton>
@@ -279,7 +279,7 @@ export function AppSidebar() {
                         to={item.url} 
                         className={({ isActive }) => getNavClassName(isActive)}
                       >
-                        <item.icon className="mr-2 h-4 w-4" />
+                          {item.icon && <item.icon className="mr-2 h-4 w-4" />}
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
