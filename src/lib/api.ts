@@ -388,6 +388,15 @@ class ApiClient {
     reject: async (id: string, notes: string) => {
       return this.patch(`/approvals/${id}/reject`, { notes });
     },
+
+    // New methods based on Postman collection
+    getPending: async (params?: any) => {
+      return this.getPaginated('/approvals/pending', params);
+    },
+
+    getStats: async () => {
+      return this.get('/approvals/stats');
+    },
   };
 
   // Email template management

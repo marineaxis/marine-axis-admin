@@ -10,6 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 
+import useCRUD from '../hooks/useCRUD';
+import api from '../lib/api';
+
 interface ApprovalRequest {
   id: string;
   type: 'provider' | 'job' | 'blog' | 'category';
@@ -27,131 +30,97 @@ interface ApprovalRequest {
   notes?: string;
 }
 
-// Mock approval requests data
-const MOCK_APPROVALS: ApprovalRequest[] = [
-  {
-    id: '1',
-    type: 'provider',
-    title: 'Pacific Marine Solutions',
-    description: 'New provider registration for marine equipment and services',
-    submitter: {
-      name: 'John Smith',
-      email: 'john@pacificmarine.com'
-    },
-    status: 'pending',
-    priority: 'high',
-    submittedAt: '2024-01-25T10:30:00Z',
-    details: {
-      companyName: 'Pacific Marine Solutions',
-      location: 'Seattle, WA',
-      services: ['Equipment Supply', 'Maintenance', 'Repair'],
-      website: 'https://pacificmarine.com',
-      employees: '25-50',
-      experience: '15 years'
-    }
-  },
-  {
-    id: '2',
-    type: 'job',
-    title: 'Senior Marine Engineer',
-    description: 'Job posting for senior marine engineer position',
-    submitter: {
-      name: 'Sarah Johnson',
-      email: 'sarah@marinesolutions.com'
-    },
-    status: 'pending',
-    priority: 'medium',
-    submittedAt: '2024-01-25T09:15:00Z',
-    details: {
-      jobTitle: 'Senior Marine Engineer',
-      location: 'Miami, FL',
-      salaryRange: '$85,000 - $120,000',
-      type: 'full-time',
-      requirements: ['10+ years experience', 'Marine engineering degree', 'Valid certifications'],
-      benefits: ['Health insurance', '401k', 'Paid vacation']
-    }
-  },
-  {
-    id: '3',
-    type: 'blog',
-    title: 'The Future of Marine Technology',
-    description: 'Blog post about emerging trends in marine technology',
-    submitter: {
-      name: 'Mike Davis',
-      email: 'mike@marinetech.com'
-    },
-    status: 'pending',
-    priority: 'low',
-    submittedAt: '2024-01-24T16:45:00Z',
-    details: {
-      title: 'The Future of Marine Technology',
-      excerpt: 'Exploring the latest innovations transforming the marine industry',
-      wordCount: 1250,
-      tags: ['Technology', 'Innovation', 'Marine Industry'],
-      featured: false
-    }
-  },
-  {
-    id: '4',
-    type: 'provider',
-    title: 'Atlantic Maritime Services',
-    description: 'Provider registration for maritime consultation services',
-    submitter: {
-      name: 'Emma Wilson',
-      email: 'emma@atlanticmaritime.com'
-    },
-    status: 'approved',
-    priority: 'medium',
-    submittedAt: '2024-01-23T14:20:00Z',
-    details: {
-      companyName: 'Atlantic Maritime Services',
-      location: 'Boston, MA',
-      services: ['Consultation', 'Training', 'Compliance'],
-      website: 'https://atlanticmaritime.com',
-      employees: '10-25',
-      experience: '8 years'
-    },
-    notes: 'Approved after verification of credentials and references.'
-  },
-  {
-    id: '5',
-    type: 'job',
-    title: 'Boat Maintenance Technician',
-    description: 'Part-time boat maintenance position',
-    submitter: {
-      name: 'Tom Rodriguez',
-      email: 'tom@coastalmarine.com'
-    },
-    status: 'rejected',
-    priority: 'low',
-    submittedAt: '2024-01-22T11:30:00Z',
-    details: {
-      jobTitle: 'Boat Maintenance Technician',
-      location: 'San Diego, CA',
-      salaryRange: '$20 - $25/hour',
-      type: 'part-time',
-      requirements: ['Basic mechanical skills', 'Willingness to learn'],
-      benefits: ['Flexible schedule', 'Training provided']
-    },
-    notes: 'Rejected due to insufficient job description and unclear requirements.'
-  }
-];
 
 export function ApprovalsPage() {
   const { toast } = useToast();
   
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>(MOCK_APPROVALS);
+  const [approvalStats, setApprovalStats] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    total: 0
+  });
   const [selectedApproval, setSelectedApproval] = useState<ApprovalRequest | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [actionNotes, setActionNotes] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Filter approvals by status
-  const pendingApprovals = approvals.filter(a => a.status === 'pending');
-  const approvedApprovals = approvals.filter(a => a.status === 'approved');
-  const rejectedApprovals = approvals.filter(a => a.status === 'rejected');
+  // Use CRUD hook for approvals management
+  const {
+    items: allApprovals,
+    loading,
+    fetchItems,
+    setFilters,
+  } = useCRUD<ApprovalRequest>({
+    resource: 'approvals',
+    api: api.approvals,
+  });
+
+  // Separate state for different approval statuses
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
+  const [approvedApprovals, setApprovedApprovals] = useState<ApprovalRequest[]>([]);
+  const [rejectedApprovals, setRejectedApprovals] = useState<ApprovalRequest[]>([]);
+
+  useEffect(() => {
+    fetchApprovalData();
+  }, []);
+
+  const fetchApprovalData = async () => {
+    try {
+      // Fetch pending approvals
+      const pendingResponse = await api.approvals.getPending();
+      if (pendingResponse.success) {
+        setPendingApprovals(pendingResponse.data);
+      }
+
+      // Fetch all approvals for approved/rejected lists
+      const allResponse = await api.approvals.list();
+      if (allResponse.success) {
+        const approved = allResponse.data.filter((a: ApprovalRequest) => a.status === 'approved');
+        const rejected = allResponse.data.filter((a: ApprovalRequest) => a.status === 'rejected');
+        setApprovedApprovals(approved);
+        setRejectedApprovals(rejected);
+      }
+
+      // Fetch approval statistics
+      const statsResponse = await api.approvals.getStats();
+      if (statsResponse.success) {
+        setApprovalStats(statsResponse.data);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch approval data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load approval data. Using offline mode.',
+        variant: 'destructive',
+      });
+      
+      // Fallback to mock data if API fails
+      const mockApprovals = [
+        {
+          id: '1',
+          type: 'provider' as const,
+          title: 'Pacific Marine Solutions',
+          description: 'New provider registration for marine equipment and services',
+          submitter: { name: 'John Smith', email: 'john@pacificmarine.com' },
+          status: 'pending' as const,
+          priority: 'high' as const,
+          submittedAt: '2024-01-25T10:30:00Z',
+          details: {
+            companyName: 'Pacific Marine Solutions',
+            location: 'Seattle, WA',
+            services: ['Equipment Supply', 'Maintenance', 'Repair'],
+            website: 'https://pacificmarine.com',
+            employees: '25-50',
+            experience: '15 years'
+          }
+        }
+      ];
+      setPendingApprovals(mockApprovals);
+      setApprovalStats({ pending: 1, approved: 0, rejected: 0, total: 1 });
+    }
+  };
 
   const handleViewDetails = (approval: ApprovalRequest) => {
     setSelectedApproval(approval);
@@ -168,19 +137,30 @@ export function ApprovalsPage() {
   const handleSubmitAction = async () => {
     if (!selectedApproval) return;
 
-    setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (actionType === 'approve') {
+        const response = await api.approvals.approve(selectedApproval.id, actionNotes.trim() || undefined);
+        if (!response.success) {
+          throw new Error(response.message || 'Failed to approve request');
+        }
+      } else {
+        if (!actionNotes.trim()) {
+          toast({
+            title: 'Rejection reason required',
+            description: 'Please provide a reason for rejecting this request',
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        const response = await api.approvals.reject(selectedApproval.id, actionNotes.trim());
+        if (!response.success) {
+          throw new Error(response.message || 'Failed to reject request');
+        }
+      }
       
-      setApprovals(prev => prev.map(approval => 
-        approval.id === selectedApproval.id 
-          ? { 
-              ...approval, 
-              status: actionType === 'approve' ? 'approved' : 'rejected',
-              notes: actionNotes.trim() || undefined
-            }
-          : approval
-      ));
+      // Refresh approval data after action
+      await fetchApprovalData();
       
       toast({
         title: `Request ${actionType === 'approve' ? 'approved' : 'rejected'}`,
@@ -191,13 +171,12 @@ export function ApprovalsPage() {
       setSelectedApproval(null);
       setActionNotes('');
     } catch (error) {
+      console.error('Approval action error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to process approval. Please try again.',
+        description: error.message || 'Failed to process approval. Please try again.',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -466,7 +445,7 @@ export function ApprovalsPage() {
             <Clock className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{pendingApprovals.length}</div>
+            <div className="text-2xl font-bold text-orange-600">{approvalStats.pending}</div>
             <p className="text-xs text-muted-foreground">Awaiting review</p>
           </CardContent>
         </Card>
@@ -477,7 +456,7 @@ export function ApprovalsPage() {
             <Check className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{approvedApprovals.length}</div>
+            <div className="text-2xl font-bold text-green-600">{approvalStats.approved}</div>
             <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
@@ -488,7 +467,7 @@ export function ApprovalsPage() {
             <X className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{rejectedApprovals.length}</div>
+            <div className="text-2xl font-bold text-red-600">{approvalStats.rejected}</div>
             <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
@@ -497,12 +476,20 @@ export function ApprovalsPage() {
       {/* Approval Lists */}
       <Tabs defaultValue="pending" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="pending">Pending ({pendingApprovals.length})</TabsTrigger>
-          <TabsTrigger value="approved">Approved ({approvedApprovals.length})</TabsTrigger>
-          <TabsTrigger value="rejected">Rejected ({rejectedApprovals.length})</TabsTrigger>
+          <TabsTrigger value="pending">Pending ({approvalStats.pending})</TabsTrigger>
+          <TabsTrigger value="approved">Approved ({approvalStats.approved})</TabsTrigger>
+          <TabsTrigger value="rejected">Rejected ({approvalStats.rejected})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending" className="space-y-4">
+          {loading ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <div className="text-muted-foreground">Loading approvals...</div>
+              </CardContent>
+            </Card>
+          ) : (
           {pendingApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -515,9 +502,18 @@ export function ApprovalsPage() {
               {pendingApprovals.map(renderApprovalCard)}
             </div>
           )}
+          )}
         </TabsContent>
 
         <TabsContent value="approved" className="space-y-4">
+          {loading ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <div className="text-muted-foreground">Loading approvals...</div>
+              </CardContent>
+            </Card>
+          ) : (
           {approvedApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -530,9 +526,18 @@ export function ApprovalsPage() {
               {approvedApprovals.map(renderApprovalCard)}
             </div>
           )}
+          )}
         </TabsContent>
 
         <TabsContent value="rejected" className="space-y-4">
+          {loading ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <div className="text-muted-foreground">Loading approvals...</div>
+              </CardContent>
+            </Card>
+          ) : (
           {rejectedApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -544,6 +549,7 @@ export function ApprovalsPage() {
             <div className="grid gap-4">
               {rejectedApprovals.map(renderApprovalCard)}
             </div>
+          )}
           )}
         </TabsContent>
       </Tabs>
@@ -671,7 +677,7 @@ export function ApprovalsPage() {
             </Button>
             <Button 
               onClick={handleSubmitAction} 
-              disabled={isLoading || (actionType === 'reject' && !actionNotes.trim())}
+              disabled={loading || (actionType === 'reject' && !actionNotes.trim())}
               variant={actionType === 'reject' ? 'destructive' : 'default'}
             >
               {actionType === 'approve' ? 'Approve' : 'Reject'}
