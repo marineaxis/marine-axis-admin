@@ -77,6 +77,10 @@ export function AppHeader() {
     navigate(ROUTES.SETTINGS);
   };
 
+  const handleLogoutAll = () => {
+    logout();
+  };
+
   const getThemeIcon = () => {
     if (theme === 'light') return <Sun className="h-4 w-4" />;
     if (theme === 'dark') return <Moon className="h-4 w-4" />;
