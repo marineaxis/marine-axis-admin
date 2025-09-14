@@ -334,6 +334,10 @@ class ApiClient {
     reorder: async (categories: Array<{ id: string; order: number }>) => {
       return this.put('/categories/reorder', { categories });
     },
+
+    getStats: async () => {
+      return this.get('/categories/stats');
+    },
   };
 
   // Blog management

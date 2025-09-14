@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, FolderTree, ToggleLeft, ToggleRight } from 'lucide-react';
 
@@ -16,80 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 
 import { Category, CreateCategoryForm } from '../types';
-
-// Mock category data
-const MOCK_CATEGORIES: Category[] = [
-  {
-    id: '1',
-    name: 'Marine Equipment',
-    description: 'Equipment and tools for marine operations',
-    icon: 'anchor',
-    parentId: undefined,
-    children: [],
-    providersCount: 25,
-    jobsCount: 45,
-    order: 1,
-    active: true,
-    createdAt: '2024-01-10T00:00:00Z',
-    updatedAt: '2024-01-10T00:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Boat Maintenance',
-    description: 'Maintenance and repair services for boats',
-    icon: 'wrench',
-    parentId: undefined,
-    children: [],
-    providersCount: 18,
-    jobsCount: 32,
-    order: 2,
-    active: true,
-    createdAt: '2024-01-10T00:00:00Z',
-    updatedAt: '2024-01-10T00:00:00Z',
-  },
-  {
-    id: '3',
-    name: 'Electronics & Navigation',
-    description: 'Marine electronics and navigation systems',
-    icon: 'radar',
-    parentId: undefined,
-    children: [],
-    providersCount: 12,
-    jobsCount: 28,
-    order: 3,
-    active: true,
-    createdAt: '2024-01-12T00:00:00Z',
-    updatedAt: '2024-01-12T00:00:00Z',
-  },
-  {
-    id: '4',
-    name: 'Repair Services',
-    description: 'Professional boat and marine equipment repair',
-    icon: 'settings',
-    parentId: undefined,
-    children: [],
-    providersCount: 22,
-    jobsCount: 38,
-    order: 4,
-    active: true,
-    createdAt: '2024-01-15T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-  {
-    id: '5',
-    name: 'Marina Services',
-    description: 'Marina operations and boat berthing services',
-    icon: 'anchor',
-    parentId: undefined,
-    children: [],
-    providersCount: 8,
-    jobsCount: 15,
-    order: 5,
-    active: false,
-    createdAt: '2024-01-18T00:00:00Z',
-    updatedAt: '2024-01-20T00:00:00Z',
-  },
-];
+import useCRUD from '../hooks/useCRUD';
+import api from '../lib/api';
 
 const ICON_OPTIONS = [
   'anchor', 'wrench', 'radar', 'settings', 'ship', 'compass', 'waves', 'gear', 'tool', 'chart'
@@ -99,9 +27,7 @@ export function CategoriesPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   
   const [createForm, setCreateForm] = useState<CreateCategoryForm>({
@@ -113,6 +39,37 @@ export function CategoriesPage() {
   });
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', icon: '', parentId: undefined, order: undefined, active: true });
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+
+  // Use CRUD hook for category management
+  const {
+    items: categories,
+    loading,
+    creating,
+    updating,
+    deleting,
+    fetchItems,
+    createItem,
+    updateItem,
+    deleteItem,
+    setFilters,
+  } = useCRUD<Category>({
+    resource: 'categories',
+    api: api.categories,
+    messages: {
+      created: 'Category created successfully',
+      updated: 'Category updated successfully',
+      deleted: 'Category deleted successfully',
+    },
+  });
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
   // Filter categories
   const filteredCategories = categories.filter(category =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -120,55 +77,14 @@ export function CategoriesPage() {
   );
 
   const handleToggleActive = async (categoryId: string) => {
-    if (!validateCreateForm()) return;
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setCategories(prev => 
-        prev.map(category => 
-          category.id === categoryId 
-            ? { ...category, active: !category.active, updatedAt: new Date().toISOString() }
-            : category
-        )
-      );
-      
-      const category = categories.find(c => c.id === categoryId);
-      toast({
-        title: `Category ${category?.active ? 'deactivated' : 'activated'}`,
-        description: `${category?.name} is now ${category?.active ? 'inactive' : 'active'}`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update category',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    const categoryToToggle = categories.find(c => c.id === categoryId);
+    if (!categoryToToggle) return;
+
+    await updateItem(categoryId, { active: !categoryToToggle.active });
   };
 
   const handleDelete = async (categoryId: string) => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const category = categories.find(c => c.id === categoryId);
-      setCategories(prev => prev.filter(c => c.id !== categoryId));
-      
-      toast({
-        title: 'Category deleted',
-        description: `${category?.name} has been removed`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete category',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await deleteItem(categoryId);
   };
 
   const validateCreateForm = (): boolean => {
@@ -185,11 +101,8 @@ export function CategoriesPage() {
   const handleCreateCategory = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const newCategory: Category = {
+    if (validateCreateForm()) {
+      const newCategoryData = {
         id: String(categories.length + 1),
         name: createForm.name.trim(),
         description: createForm.description.trim(),
@@ -200,34 +113,61 @@ export function CategoriesPage() {
         jobsCount: 0,
         order: createForm.order || categories.length + 1,
         active: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
+      const result = await createItem(newCategoryData);
+      if (result) {
+        setIsCreateDialogOpen(false);
+        setCreateForm({
+          name: '',
+          description: '',
+          icon: 'anchor',
+          parentId: undefined,
+          order: undefined,
+        });
+        setCreateErrors({});
+      }
+    }
+  };
 
-      setCategories(prev => [...prev, newCategory]);
-      
-      toast({
-        title: 'Category created',
-        description: `${newCategory.name} has been added`,
-      });
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    setEditForm({
+      name: category.name,
+      description: category.description,
+      icon: category.icon,
+      parentId: category.parentId,
+      order: category.order,
+      active: category.active,
+    });
+    setEditErrors({});
+    setIsEditDialogOpen(true);
+  };
 
-      setIsCreateDialogOpen(false);
-      setCreateForm({
-        name: '',
-        description: '',
-        icon: 'anchor',
-        parentId: undefined,
-        order: undefined,
-      });
-      setCreateErrors({});
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create category',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+  const validateEditForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!editForm.name.trim()) newErrors.name = 'Category name is required';
+    if (!editForm.description.trim()) newErrors.description = 'Description is required';
+    if (!editForm.icon) newErrors.icon = 'Icon is required';
+
+    setEditErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleUpdateCategory = async () => {
+    if (!validateEditForm() || !editingCategory) return;
+
+    const updateData = {
+      name: editForm.name.trim(),
+      description: editForm.description.trim(),
+      icon: editForm.icon,
+      parentId: editForm.parentId,
+      order: editForm.order,
+      active: editForm.active,
+    };
+    const result = await updateItem(editingCategory.id, updateData);
+    if (result) {
+      setIsEditDialogOpen(false);
+      setEditingCategory(null);
     }
   };
 
@@ -239,6 +179,27 @@ export function CategoriesPage() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Categories</h1>
+            <p className="text-muted-foreground">Manage service categories and classifications</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 bg-muted rounded animate-pulse" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -321,7 +282,7 @@ export function CategoriesPage() {
                 </Select>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -329,7 +290,7 @@ export function CategoriesPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleCreateCategory} disabled={isLoading}>
+              <Button onClick={handleCreateCategory} disabled={creating}>
                 Create Category
               </Button>
             </DialogFooter>
@@ -428,7 +389,7 @@ export function CategoriesPage() {
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" />
+                              <Edit className="mr-2 h-4 w-4" onClick={() => handleEditCategory(category)} />
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -470,7 +431,7 @@ export function CategoriesPage() {
                                   <AlertDialogAction
                                     onClick={() => handleDelete(category.id)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    disabled={isLoading}
+                                    disabled={deleting}
                                   >
                                     Delete Category
                                   </AlertDialogAction>
@@ -489,6 +450,81 @@ export function CategoriesPage() {
         </CardContent>
       </Card>
     </div>
+      {/* Edit Category Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Category</DialogTitle>
+            <DialogDescription>
+              Update category details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Category Name *</Label>
+              <Input
+                id="edit-name"
+                placeholder="Enter category name"
+                value={editForm.name}
+                onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                className={editErrors.name ? 'border-destructive' : ''}
+              />
+              {editErrors.name && <p className="text-sm text-destructive">{editErrors.name}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description *</Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Describe this category"
+                rows={3}
+                value={editForm.description}
+                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                className={editErrors.description ? 'border-destructive' : ''}
+              />
+              {editErrors.description && <p className="text-sm text-destructive">{editErrors.description}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-icon">Icon *</Label>
+              <Select value={editForm.icon} onValueChange={(value) => setEditForm(prev => ({ ...prev, icon: value }))}>
+                <SelectTrigger className={editErrors.icon ? 'border-destructive' : ''}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ICON_OPTIONS.map((icon) => (
+                    <SelectItem key={icon} value={icon}>
+                      {icon}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editErrors.icon && <p className="text-sm text-destructive">{editErrors.icon}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-parent">Parent Category (optional)</Label>
+              <Select value={editForm.parentId || 'none'} onValueChange={(value) => setEditForm(prev => ({ ...prev, parentId: value === 'none' ? undefined : value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select parent category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Top level)</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateCategory} disabled={updating}>Update Category</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
   );
 }
 
