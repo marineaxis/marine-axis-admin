@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, X, Clock, AlertCircle, User, Briefcase, Building2, Eye, MessageSquare } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -170,7 +170,7 @@ export function ApprovalsPage() {
       setActionDialogOpen(false);
       setSelectedApproval(null);
       setActionNotes('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Approval action error:', error);
       toast({
         title: 'Error',
@@ -501,7 +501,7 @@ export function ApprovalsPage() {
             <div className="grid gap-4">
               {pendingApprovals.map(renderApprovalCard)}
             </div>
-          )}
+          ))}
         </TabsContent>
 
         <TabsContent value="approved" className="space-y-4">
@@ -524,7 +524,7 @@ export function ApprovalsPage() {
             <div className="grid gap-4">
               {approvedApprovals.map(renderApprovalCard)}
             </div>
-          )}
+          ))}
         </TabsContent>
 
         <TabsContent value="rejected" className="space-y-4">
@@ -547,7 +547,7 @@ export function ApprovalsPage() {
             <div className="grid gap-4">
               {rejectedApprovals.map(renderApprovalCard)}
             </div>
-          )}
+          ))}
         </TabsContent>
       </Tabs>
 
