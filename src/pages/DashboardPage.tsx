@@ -30,6 +30,27 @@ import { Analytics, Provider, Job, Blog, Approval } from '../types';
 import api from '../lib/api';
 import { useToast } from '@/hooks/use-toast';
 
+// Default analytics state to prevent undefined errors
+const DEFAULT_ANALYTICS_STATE: Analytics = {
+  totalProviders: 0,
+  totalJobs: 0,
+  totalBlogs: 0,
+  totalUsers: 0,
+  pendingApprovals: 0,
+  activeJobs: 0,
+  featuredProviders: 0,
+  publishedBlogs: 0,
+  monthlyStats: {
+    providers: 0,
+    jobs: 0,
+    blogs: 0,
+    applications: 0,
+  },
+  categoryStats: [],
+  topLocations: [],
+  recentActivity: [],
+};
+
 interface StatCard {
   title: string;
   value: string | number;
@@ -43,7 +64,7 @@ export function DashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics>(DEFAULT_ANALYTICS_STATE);
   const [recentProviders, setRecentProviders] = useState<Provider[]>([]);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<Approval[]>([]);
@@ -60,7 +81,19 @@ export function DashboardPage() {
       // Fetch admin dashboard data
       const analyticsResponse = await api.analytics.adminDashboard();
       if (analyticsResponse.success) {
-        setAnalytics(analyticsResponse.data);
+        setAnalytics(prev => ({
+          ...prev,
+          ...analyticsResponse.data,
+          // Explicitly merge nested objects to prevent them from being overwritten by undefined
+          monthlyStats: {
+            ...prev.monthlyStats,
+            ...(analyticsResponse.data.monthlyStats || {}),
+          },
+          // Ensure arrays are defaulted to empty if API returns null/undefined
+          categoryStats: analyticsResponse.data.categoryStats || [],
+          topLocations: analyticsResponse.data.topLocations || [],
+          recentActivity: analyticsResponse.data.recentActivity || [],
+        }));
       }
 
       // Fetch recent providers
@@ -122,40 +155,39 @@ export function DashboardPage() {
   };
 
   const getStatCards = (): StatCard[] => {
-    if (!analytics) return [];
 
     return [
       {
         title: 'Total Providers',
-        value: analytics.totalProviders,
-        change: `+${analytics.monthlyStats.providers} this month`,
+        value: analytics.totalProviders ?? 0,
+        change: `+${analytics.monthlyStats?.providers ?? 0} this month`,
         trend: 'up',
         icon: Building2,
         color: 'text-primary',
       },
       {
         title: 'Active Jobs',
-        value: analytics.activeJobs,
-        change: `+${analytics.monthlyStats.jobs} this month`,
+        value: analytics.activeJobs ?? 0,
+        change: `+${analytics.monthlyStats?.jobs ?? 0} this month`,
         trend: 'up',
         icon: Briefcase,
         color: 'text-success',
       },
       {
         title: 'Published Blogs',
-        value: analytics.publishedBlogs,
-        change: `+${analytics.monthlyStats.blogs} this month`,
+        value: analytics.publishedBlogs ?? 0,
+        change: `+${analytics.monthlyStats?.blogs ?? 0} this month`,
         trend: 'up',
         icon: FileText,
         color: 'text-accent',
       },
       {
         title: 'Pending Approvals',
-        value: analytics.pendingApprovals,
+        value: analytics.pendingApprovals ?? 0,
         change: 'Require attention',
-        trend: analytics.pendingApprovals > 10 ? 'up' : 'neutral',
+        trend: (analytics.pendingApprovals ?? 0) > 10 ? 'up' : 'neutral',
         icon: Clock,
-        color: analytics.pendingApprovals > 10 ? 'text-warning' : 'text-muted-foreground',
+        color: (analytics.pendingApprovals ?? 0) > 10 ? 'text-warning' : 'text-muted-foreground',
       },
     ];
   };
