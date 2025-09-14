@@ -52,10 +52,6 @@ export function AdminsPage() {
     },
   });
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
   // Apply filters when search or filter values change
   useEffect(() => {
     const filters: any = {};
