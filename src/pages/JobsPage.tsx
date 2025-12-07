@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Play, Pause, Clock, MapPin } from 'lucide-react';
 
@@ -14,202 +14,145 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-import { Job } from '../types';
+import useCRUD from '../hooks/useCRUD';
+import api from '../lib/api';
 
-// Mock job data
-const MOCK_JOBS: Job[] = [
-  {
-    id: '1',
-    title: 'Marine Engineer',
-    description: 'Experienced marine engineer for luxury yacht maintenance.',
-    providerId: '1',
-    categoryIds: ['1', '2'],
-    location: 'Miami, FL',
-    salaryRange: { min: 75000, max: 95000, currency: 'USD' },
-    requirements: ['5+ years experience', 'Marine engineering degree', 'Valid certifications'],
-    benefits: ['Health insurance', '401k', 'Paid vacation'],
-    type: 'full-time',
-    remote: false,
-    urgency: 'medium',
-    status: 'published',
-    expiresAt: '2024-03-15T00:00:00Z',
-    applications: 12,
-    createdAt: '2024-01-20T00:00:00Z',
-    updatedAt: '2024-01-22T00:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Boat Captain',
-    description: 'Looking for experienced boat captain for charter services.',
-    providerId: '2',
-    categoryIds: ['5'],
-    location: 'San Diego, CA',
-    salaryRange: { min: 60000, max: 80000, currency: 'USD' },
-    requirements: ['Captain license', '10+ years experience', 'Clean record'],
-    benefits: ['Competitive salary', 'Tips', 'Flexible schedule'],
-    type: 'full-time',
-    remote: false,
-    urgency: 'high',
-    status: 'published',
-    expiresAt: '2024-02-28T00:00:00Z',
-    applications: 8,
-    createdAt: '2024-01-18T00:00:00Z',
-    updatedAt: '2024-01-18T00:00:00Z',
-  },
-  {
-    id: '3',
-    title: 'Marine Electronics Technician',
-    description: 'Part-time position for marine electronics installation and repair.',
-    providerId: '3',
-    categoryIds: ['3'],
-    location: 'Boston, MA',
-    salaryRange: { min: 25, max: 35, currency: 'USD' },
-    requirements: ['Electronics background', 'Problem-solving skills'],
-    benefits: ['Flexible hours', 'Training provided'],
-    type: 'part-time',
-    remote: false,
-    urgency: 'low',
-    status: 'draft',
-    expiresAt: '2024-04-01T00:00:00Z',
-    applications: 0,
-    createdAt: '2024-01-25T00:00:00Z',
-    updatedAt: '2024-01-25T00:00:00Z',
-  },
-];
+import { Job, TableFilters, ApiResponse } from '../types';
 
 export function JobsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(false);
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
-  // Filter jobs
-  const filteredJobs = jobs.filter(job => {
-    const matchesSearch = 
-      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.location.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  const handlePublish = async (jobId: string) => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setJobs(prev => 
-        prev.map(job => 
-          job.id === jobId 
-            ? { ...job, status: 'published' as const, updatedAt: new Date().toISOString() }
-            : job
-        )
-      );
-      
-      toast({
-        title: 'Job published',
-        description: 'Job is now live and accepting applications',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to publish job',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+  // adapt api.jobs to the exact shape expected by useCRUD (delete returns ApiResponse<void>)
+  const jobsApiForCrud = {
+    list: api.jobs.list,
+    get: api.jobs.get,
+    create: api.jobs.create,
+    update: api.jobs.update,
+    delete: async (id: string) => {
+      const res = await api.jobs.delete(id);
+      return res as unknown as ApiResponse<void>;
     }
   };
 
-  const handlePause = async (jobId: string) => {
-    setIsLoading(true);
+  const {
+    items: jobs,
+    loading,
+    setFilters,
+    fetchItems,
+    deleteItem,
+    updateItem,
+    filters,
+  } = useCRUD<Job>({
+    resource: 'jobs',
+    api: jobsApiForCrud,
+    messages: { deleted: 'Job deleted successfully', updated: 'Job updated successfully' }
+  });
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+
+  // Debounced fetch that reacts to the hook filters (prevents refresh storms)
+  const fetchDebounceTimer = useRef<number | null>(null);
+  const lastFetchedFiltersKeyRef = useRef<string | null>(null);
+
+  const filtersKey = React.useMemo(() => {
+    try { return JSON.stringify(filters || {}); } catch { return String(filters || ''); }
+  }, [filters]);
+
+  useEffect(() => {
+    if (!filtersKey) return;
+    // If we've already fetched this exact filter set, skip
+    if (lastFetchedFiltersKeyRef.current === filtersKey) return;
+
+    // debounce to avoid rapid repeated requests
+    if (fetchDebounceTimer.current) {
+      clearTimeout(fetchDebounceTimer.current);
+      fetchDebounceTimer.current = null;
+    }
+
+    fetchDebounceTimer.current = window.setTimeout(async () => {
+      let parsedFilters: TableFilters | undefined;
+      try { parsedFilters = JSON.parse(filtersKey) as TableFilters; } catch { parsedFilters = undefined; }
+      if (!parsedFilters) return;
+
+      try {
+        const result = await fetchItems(parsedFilters);
+        if (result) {
+          lastFetchedFiltersKeyRef.current = filtersKey;
+        }
+      } catch (error) {
+        // swallow - fetchItems already handles toasts
+        // but ensure we don't leave lastFetchedFiltersKeyRef set
+      }
+    }, 200);
+
+    return () => {
+      if (fetchDebounceTimer.current) {
+        clearTimeout(fetchDebounceTimer.current);
+        fetchDebounceTimer.current = null;
+      }
+    };
+  }, [filtersKey, fetchItems]);
+
+  React.useEffect(() => {
+    const filters: Partial<TableFilters> = {};
+    if (searchQuery.trim()) filters.search = searchQuery.trim();
+    if (statusFilter !== 'all') filters.status = statusFilter;
+    setFilters(filters);
+  }, [searchQuery, statusFilter, setFilters]);
+
+  const handlePublish = async (jobId: string) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setJobs(prev => 
-        prev.map(job => 
-          job.id === jobId 
-            ? { ...job, status: 'paused' as const, updatedAt: new Date().toISOString() }
-            : job
-        )
-      );
-      
-      toast({
-        title: 'Job paused',
-        description: 'Job is no longer accepting applications',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to pause job',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+      const res = await api.jobs.publish(jobId);
+      if (res.success) {
+        toast({ title: 'Job published', description: 'Job is now live' });
+        await fetchItems();
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Error', description: msg || 'Failed to publish job', variant: 'destructive' });
+    }
+  };
+
+  const handleUnpublish = async (jobId: string) => {
+    try {
+      const res = await api.jobs.unpublish(jobId);
+      if (res.success) {
+        toast({ title: 'Job unpublished', description: 'Job taken offline' });
+        await fetchItems();
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Error', description: msg || 'Failed to unpublish job', variant: 'destructive' });
     }
   };
 
   const handleClose = async (jobId: string) => {
-    setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setJobs(prev => 
-        prev.map(job => 
-          job.id === jobId 
-            ? { ...job, status: 'closed' as const, updatedAt: new Date().toISOString() }
-            : job
-        )
-      );
-      
-      toast({
-        title: 'Job closed',
-        description: 'Job has been closed and archived',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to close job',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+      const res = await api.jobs.close(jobId);
+      if (res.success) {
+        toast({ title: 'Job closed', description: 'Job has been closed' });
+        await fetchItems();
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Error', description: msg || 'Failed to close job', variant: 'destructive' });
     }
   };
 
   const handleDelete = async (jobId: string) => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const job = jobs.find(j => j.id === jobId);
-      setJobs(prev => prev.filter(j => j.id !== jobId));
-      
-      toast({
-        title: 'Job deleted',
-        description: `${job?.title} has been removed`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete job',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await deleteItem(jobId);
   };
 
   const handleViewDetails = (job: Job) => {
     setSelectedJob(job);
     setViewDetailsOpen(true);
   };
+
+  const filteredJobs = jobs;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -239,14 +182,15 @@ export function JobsPage() {
     }
   };
 
-  const formatSalary = (salaryRange: any, type: string) => {
+  const formatSalary = (salaryRange: Job['salaryRange'] | undefined, type: string) => {
+    if (!salaryRange) return 'N/A';
     const { min, max, currency } = salaryRange;
-    const prefix = currency === 'USD' ? '$' : currency;
-    
+    const prefix = currency === 'USD' ? '$' : `${currency} `;
+
     if (type === 'part-time') {
       return `${prefix}${min}-${max}/hr`;
     }
-    
+
     return `${prefix}${min.toLocaleString()}-${max.toLocaleString()}/yr`;
   };
 
@@ -364,7 +308,7 @@ export function JobsPage() {
                       <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell>
                         <div className="text-center">
-                          <span className="font-medium">{job.applications}</span>
+                          <span className="font-medium">{job.applications ?? 0}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -387,7 +331,7 @@ export function JobsPage() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/jobs/${job.id}/edit`)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -399,12 +343,12 @@ export function JobsPage() {
                               </DropdownMenuItem>
                             )}
                             {job.status === 'published' && (
-                              <DropdownMenuItem onClick={() => handlePause(job.id)}>
+                              <DropdownMenuItem onClick={() => handleUnpublish(job.id)}>
                                 <Pause className="mr-2 h-4 w-4" />
-                                Pause
+                                Unpublish
                               </DropdownMenuItem>
                             )}
-                            {(job.status === 'published' || job.status === 'paused') && (
+                            {(job.status === 'draft' || job.status === 'published') && (
                               <DropdownMenuItem onClick={() => handleClose(job.id)}>
                                 <Clock className="mr-2 h-4 w-4" />
                                 Close
@@ -434,7 +378,7 @@ export function JobsPage() {
                                   <AlertDialogAction
                                     onClick={() => handleDelete(job.id)}
                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    disabled={isLoading}
+                                    disabled={loading}
                                   >
                                     Delete Job
                                   </AlertDialogAction>

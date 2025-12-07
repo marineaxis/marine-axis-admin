@@ -40,7 +40,17 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { ROUTES } from '../../lib/constants';
 
-const navigationItems = [
+type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
+
+interface NavItem {
+  title: string;
+  url?: string;
+  icon?: IconType;
+  roles?: string[];
+  children?: NavItem[];
+}
+
+const navigationItems: NavItem[] = [
   {
     title: 'Dashboard',
     url: ROUTES.DASHBOARD,
@@ -180,8 +190,8 @@ export function AppSidebar() {
     return location.pathname.startsWith(path);
   };
 
-  const isGroupActive = (children: any[]) => {
-    return children.some(child => isActive(child.url));
+  const isGroupActive = (children: NavItem[]) => {
+    return children.some(child => isActive(child.url || ''));
   };
 
   const getNavClassName = (isActiveLink: boolean) => {
@@ -190,10 +200,10 @@ export function AppSidebar() {
       : 'hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground';
   };
 
-  const filterNavigationByRole = (items: typeof navigationItems) => {
+  const filterNavigationByRole = (items: NavItem[]) => {
     return items.filter(item => {
       if (item.roles) {
-        return item.roles.some(role => hasRole(role as any));
+        return item.roles.some(role => hasRole(role as unknown as 'admin' | 'provider' | 'customer'));
       }
       return true;
     });

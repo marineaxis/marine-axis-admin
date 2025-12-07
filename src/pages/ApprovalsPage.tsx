@@ -12,6 +12,40 @@ import { useToast } from '@/hooks/use-toast';
 
 import useCRUD from '../hooks/useCRUD';
 import api from '../lib/api';
+import { TableFilters, PaginatedResponse, ApiResponse } from '../types';
+
+interface ProviderDetails {
+  companyName?: string;
+  location?: string;
+  services?: string[];
+  website?: string;
+  employees?: string;
+  experience?: string;
+}
+
+interface JobDetails {
+  jobTitle?: string;
+  location?: string;
+  salaryRange?: string;
+  type?: string;
+  requirements?: string[];
+  benefits?: string[];
+}
+
+interface BlogDetails {
+  title?: string;
+  wordCount?: number;
+  featured?: boolean;
+  excerpt?: string;
+  tags?: string[];
+}
+
+interface CategoryDetails {
+  name?: string;
+  description?: string;
+}
+
+type ApprovalDetails = ProviderDetails | JobDetails | BlogDetails | CategoryDetails | undefined;
 
 interface ApprovalRequest {
   id: string;
@@ -26,7 +60,7 @@ interface ApprovalRequest {
   status: 'pending' | 'approved' | 'rejected';
   priority: 'low' | 'medium' | 'high';
   submittedAt: string;
-  details: any;
+  details?: ApprovalDetails;
   notes?: string;
 }
 
@@ -47,6 +81,15 @@ export function ApprovalsPage() {
   const [actionNotes, setActionNotes] = useState('');
 
   // Use CRUD hook for approvals management
+  // Cast the approvals API to the CRUD subset expected by useCRUD
+  const approvalsApi = api.approvals as unknown as {
+    list: (params?: TableFilters) => Promise<PaginatedResponse<ApprovalRequest>>;
+    get: (id: string) => Promise<ApiResponse<ApprovalRequest>>;
+    create?: (data?: unknown) => Promise<ApiResponse<ApprovalRequest>>;
+    update?: (id: string, data?: unknown) => Promise<ApiResponse<ApprovalRequest>>;
+    delete?: (id: string) => Promise<ApiResponse<void>>;
+  };
+
   const {
     items: allApprovals,
     loading,
@@ -54,7 +97,7 @@ export function ApprovalsPage() {
     setFilters,
   } = useCRUD<ApprovalRequest>({
     resource: 'approvals',
-    api: api.approvals,
+    api: approvalsApi,
   });
 
   // Separate state for different approval statuses
@@ -62,23 +105,19 @@ export function ApprovalsPage() {
   const [approvedApprovals, setApprovedApprovals] = useState<ApprovalRequest[]>([]);
   const [rejectedApprovals, setRejectedApprovals] = useState<ApprovalRequest[]>([]);
 
-  useEffect(() => {
-    fetchApprovalData();
-  }, []);
-
-  const fetchApprovalData = async () => {
+  const fetchApprovalData = React.useCallback(async () => {
     try {
       // Fetch pending approvals
       const pendingResponse = await api.approvals.getPending();
       if (pendingResponse.success) {
-        setPendingApprovals(pendingResponse.data);
+        setPendingApprovals(pendingResponse.data as ApprovalRequest[]);
       }
 
       // Fetch all approvals for approved/rejected lists
       const allResponse = await api.approvals.list();
       if (allResponse.success) {
-        const approved = allResponse.data.filter((a: ApprovalRequest) => a.status === 'approved');
-        const rejected = allResponse.data.filter((a: ApprovalRequest) => a.status === 'rejected');
+        const approved = (allResponse.data as ApprovalRequest[]).filter((a) => a.status === 'approved');
+        const rejected = (allResponse.data as ApprovalRequest[]).filter((a) => a.status === 'rejected');
         setApprovedApprovals(approved);
         setRejectedApprovals(rejected);
       }
@@ -86,10 +125,11 @@ export function ApprovalsPage() {
       // Fetch approval statistics
       const statsResponse = await api.approvals.getStats();
       if (statsResponse.success) {
-        setApprovalStats(statsResponse.data);
+        setApprovalStats(statsResponse.data as { pending: number; approved: number; rejected: number; total: number });
       }
-    } catch (error: any) {
-      console.error('Failed to fetch approval data:', error);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Failed to fetch approval data:', msg);
       toast({
         title: 'Error',
         description: 'Failed to load approval data. Using offline mode.',
@@ -97,15 +137,15 @@ export function ApprovalsPage() {
       });
       
       // Fallback to mock data if API fails
-      const mockApprovals = [
+      const mockApprovals: ApprovalRequest[] = [
         {
           id: '1',
-          type: 'provider' as const,
+          type: 'provider',
           title: 'Pacific Marine Solutions',
           description: 'New provider registration for marine equipment and services',
           submitter: { name: 'John Smith', email: 'john@pacificmarine.com' },
-          status: 'pending' as const,
-          priority: 'high' as const,
+          status: 'pending',
+          priority: 'high',
           submittedAt: '2024-01-25T10:30:00Z',
           details: {
             companyName: 'Pacific Marine Solutions',
@@ -120,7 +160,9 @@ export function ApprovalsPage() {
       setPendingApprovals(mockApprovals);
       setApprovalStats({ pending: 1, approved: 0, rejected: 0, total: 1 });
     }
-  };
+  }, [toast]);
+
+  React.useEffect(() => { fetchApprovalData(); }, [fetchApprovalData]);
 
   const handleViewDetails = (approval: ApprovalRequest) => {
     setSelectedApproval(approval);
@@ -170,11 +212,12 @@ export function ApprovalsPage() {
       setActionDialogOpen(false);
       setSelectedApproval(null);
       setActionNotes('');
-    } catch (error: any) {
-      console.error('Approval action error:', error);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Approval action error:', msg);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to process approval. Please try again.',
+        description: msg || 'Failed to process approval. Please try again.',
         variant: 'destructive',
       });
     }
@@ -315,29 +358,29 @@ export function ApprovalsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium">Company Name</Label>
-                <div className="text-sm">{approval.details.companyName}</div>
+                <div className="text-sm">{(approval.details as ProviderDetails | undefined)?.companyName}</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Location</Label>
-                <div className="text-sm">{approval.details.location}</div>
+                <div className="text-sm">{(approval.details as ProviderDetails | undefined)?.location}</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Website</Label>
-                <div className="text-sm">{approval.details.website}</div>
+                <div className="text-sm">{(approval.details as ProviderDetails | undefined)?.website}</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Company Size</Label>
-                <div className="text-sm">{approval.details.employees} employees</div>
+                <div className="text-sm">{(approval.details as ProviderDetails | undefined)?.employees} employees</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Experience</Label>
-                <div className="text-sm">{approval.details.experience}</div>
+                <div className="text-sm">{(approval.details as ProviderDetails | undefined)?.experience}</div>
               </div>
             </div>
             <div>
               <Label className="text-sm font-medium">Services</Label>
               <div className="flex flex-wrap gap-2 mt-1">
-                {approval.details.services.map((service: string) => (
+                {approval.type === 'provider' && ((approval.details as ProviderDetails | undefined)?.services || []).map((service) => (
                   <Badge key={service} variant="outline">{service}</Badge>
                 ))}
               </div>
@@ -351,25 +394,25 @@ export function ApprovalsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium">Job Title</Label>
-                <div className="text-sm">{approval.details.jobTitle}</div>
+                <div className="text-sm">{(approval.details as JobDetails | undefined)?.jobTitle}</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Location</Label>
-                <div className="text-sm">{approval.details.location}</div>
+                <div className="text-sm">{(approval.details as JobDetails | undefined)?.location}</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Salary Range</Label>
-                <div className="text-sm">{approval.details.salaryRange}</div>
+                <div className="text-sm">{(approval.details as JobDetails | undefined)?.salaryRange}</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Type</Label>
-                <div className="text-sm">{approval.details.type}</div>
+                <div className="text-sm">{(approval.details as JobDetails | undefined)?.type}</div>
               </div>
             </div>
             <div>
               <Label className="text-sm font-medium">Requirements</Label>
               <ul className="text-sm list-disc list-inside mt-1">
-                {approval.details.requirements.map((req: string, index: number) => (
+                {approval.type === 'job' && ((approval.details as JobDetails | undefined)?.requirements || []).map((req, index) => (
                   <li key={index}>{req}</li>
                 ))}
               </ul>
@@ -377,7 +420,7 @@ export function ApprovalsPage() {
             <div>
               <Label className="text-sm font-medium">Benefits</Label>
               <div className="flex flex-wrap gap-2 mt-1">
-                {approval.details.benefits.map((benefit: string) => (
+                {approval.type === 'job' && ((approval.details as JobDetails | undefined)?.benefits || []).map((benefit) => (
                   <Badge key={benefit} variant="outline">{benefit}</Badge>
                 ))}
               </div>
@@ -391,25 +434,25 @@ export function ApprovalsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium">Title</Label>
-                <div className="text-sm">{approval.details.title}</div>
+                <div className="text-sm">{(approval.details as BlogDetails | undefined)?.title}</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Word Count</Label>
-                <div className="text-sm">{approval.details.wordCount} words</div>
+                <div className="text-sm">{(approval.details as BlogDetails | undefined)?.wordCount} words</div>
               </div>
               <div>
                 <Label className="text-sm font-medium">Featured</Label>
-                <div className="text-sm">{approval.details.featured ? 'Yes' : 'No'}</div>
+                <div className="text-sm">{(approval.details as BlogDetails | undefined)?.featured ? 'Yes' : 'No'}</div>
               </div>
             </div>
             <div>
               <Label className="text-sm font-medium">Excerpt</Label>
-              <div className="text-sm">{approval.details.excerpt}</div>
+              <div className="text-sm">{(approval.details as BlogDetails | undefined)?.excerpt}</div>
             </div>
             <div>
               <Label className="text-sm font-medium">Tags</Label>
               <div className="flex flex-wrap gap-2 mt-1">
-                {approval.details.tags.map((tag: string) => (
+                {approval.type === 'blog' && ((approval.details as BlogDetails | undefined)?.tags || []).map((tag) => (
                   <Badge key={tag} variant="outline">{tag}</Badge>
                 ))}
               </div>

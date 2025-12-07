@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, FileText, Calendar, Tag, Star, Archive, Play } from 'lucide-react';
 
@@ -12,9 +12,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import ErrorPanel from '@/components/ErrorPanel';
 
-import { Blog } from '../types';
-import useCRUD from '../hooks/useCRUD';
+import type { Blog, TableFilters, PaginatedResponse, ApiResponse } from '../types';
+import useCRUD, { CRUDConfig } from '../hooks/useCRUD';
 import api from '../lib/api';
 
 export function BlogsPage() {
@@ -32,8 +33,28 @@ export function BlogsPage() {
     archived: 0,
     featured: 0,
   });
+  const [fetchError, setFetchError] = useState<{ message?: string; status?: number; url?: string } | null>(null);
+
+  const getViewCount = (b: Blog): number => {
+    return typeof b.viewCount === 'number' ? b.viewCount : 0;
+  };
 
   // Use CRUD hook for blog management
+  const crudConfig: CRUDConfig<Blog> = {
+    resource: 'blogs',
+    api: {
+      list: api.blogs.listAdmin,
+      get: api.blogs.get,
+      create: api.blogs.create,
+      update: api.blogs.update,
+      delete: api.blogs.delete,
+    },
+    messages: {
+      updated: 'Blog updated successfully',
+      deleted: 'Blog deleted successfully',
+    },
+  };
+
   const {
     items: blogs,
     loading,
@@ -43,121 +64,206 @@ export function BlogsPage() {
     updateItem,
     deleteItem,
     setFilters,
-  } = useCRUD<Blog>({
-    resource: 'blogs',
-    api: {
-      ...api.blogs,
-      list: api.blogs.listAdmin, // Use admin endpoint for full blog list
-    },
-    messages: {
-      updated: 'Blog updated successfully',
-      deleted: 'Blog deleted successfully',
-    },
-  });
+    resetFilters,
+    // pull current filters from hook state
+    filters,
+  } = useCRUD<Blog>(crudConfig);
 
   useEffect(() => {
     fetchBlogData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchBlogData = async () => {
     try {
-      // Fetch blogs using admin endpoint
-      await fetchItems();
-      
-      // Fetch blog statistics
+      // Fetch blog statistics only; list is fetched by filters effect
       const statsResponse = await api.blogs.getStats();
-      if (statsResponse.success) {
-        setBlogStats(statsResponse.data);
+      if (statsResponse.success && statsResponse.data) {
+        const d = statsResponse.data as unknown as Partial<typeof blogStats>;
+        setBlogStats(prev => ({ ...prev, ...(d as typeof blogStats) }));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch blog data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load blog data. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to load blog data. Please try again.', variant: 'destructive' });
     }
   };
 
-  // Apply filters when search or filter values change
+  // Keep track of the last filters we applied from the UI to avoid feedback loops
+  const lastAppliedFiltersRef = React.useRef<Record<string, string> | null>(null);
+  // Store key of last successful fetch to avoid duplicate requests
+  const lastFetchedFiltersKeyRef = React.useRef<string | null>(null);
+
+  // Stable serialized filters key to avoid object-identity churn in effect deps
+  const filtersKey = useMemo(() => {
+    try { return JSON.stringify(filters || {}); } catch { return String(filters || ''); }
+  }, [filters]);
+
+  // Initialize lastAppliedFiltersRef from the hook filters once to avoid
+  // treating the initial hook-provided filters as different on first render.
+  React.useEffect(() => {
+    if (lastAppliedFiltersRef.current === null && filters) {
+      // Normalize to string map for comparison
+      const norm: Record<string, string> = {};
+      Object.keys(filters).forEach((k) => { const v = (filters as Record<string, unknown>)[k]; if (v !== undefined) norm[k] = String(v); });
+      lastAppliedFiltersRef.current = norm;
+    }
+  // run once when filters become available
+  }, [filters]);
+
+  // Debounced filter updates to hook state (no fetch here)
   useEffect(() => {
-    const filters: any = {};
-    
-    if (searchQuery.trim()) {
-      filters.search = searchQuery.trim();
+    const nextFilters: Record<string, string> = {};
+    if (searchQuery.trim()) nextFilters.search = searchQuery.trim();
+    if (statusFilter !== 'all') nextFilters.status = statusFilter;
+
+    const last = lastAppliedFiltersRef.current;
+    const nextKeys = Object.keys(nextFilters);
+
+    const isSame = (() => {
+      if (!last) return false;
+      const lastKeys = Object.keys(last);
+      if (lastKeys.length !== nextKeys.length) return false;
+      for (const k of nextKeys) {
+        if (String(last[k]) !== String(nextFilters[k])) return false;
+      }
+      return true;
+    })();
+
+    if (!isSame) {
+      if (nextKeys.length === 0) {
+        const defaultFilters = { page: 1, limit: 25, sortOrder: 'desc' } as unknown as Record<string, string>;
+        lastAppliedFiltersRef.current = defaultFilters;
+        setFilters(defaultFilters as unknown as Partial<TableFilters>);
+      } else {
+        lastAppliedFiltersRef.current = nextFilters;
+        setFilters(nextFilters as unknown as Partial<TableFilters>);
+      }
     }
-    
-    if (statusFilter !== 'all') {
-      filters.status = statusFilter;
-    }
-    
-    setFilters(filters);
+  // only respond to UI-controlled values
   }, [searchQuery, statusFilter, setFilters]);
+
+  // Fetch whenever filters in hook state change (debounced)
+  const fetchDebounceTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (!filtersKey) return;
+    setFetchError(null);
+
+    // If we've already fetched this exact filter set, skip
+    if (lastFetchedFiltersKeyRef.current === filtersKey) return;
+
+    // debounce to avoid rapid repeated requests
+    if (fetchDebounceTimer.current) {
+      clearTimeout(fetchDebounceTimer.current);
+      fetchDebounceTimer.current = null;
+    }
+
+    fetchDebounceTimer.current = window.setTimeout(async () => {
+      // parse filters and call fetchItems once
+      let parsedFilters: TableFilters | undefined;
+      try { parsedFilters = JSON.parse(filtersKey) as TableFilters; } catch { parsedFilters = undefined; }
+      if (!parsedFilters) return;
+
+      try {
+        const result = await fetchItems(parsedFilters);
+        if (!result) return;
+        const norm: Record<string, string> = {};
+        Object.keys(parsedFilters).forEach((k) => { const v = (parsedFilters as Record<string, unknown>)[k]; if (v !== undefined) norm[k] = String(v); });
+        lastAppliedFiltersRef.current = norm;
+        lastFetchedFiltersKeyRef.current = filtersKey;
+      } catch (error: unknown) {
+        const errRec = error as unknown as Record<string, unknown>;
+        setFetchError({ message: typeof errRec?.message === 'string' ? (errRec.message as string) : undefined, status: typeof errRec?.status === 'number' ? (errRec.status as number) : undefined, url: typeof errRec?.url === 'string' ? (errRec.url as string) : undefined });
+      }
+    }, 500);
+
+    return () => {
+      if (fetchDebounceTimer.current) {
+        clearTimeout(fetchDebounceTimer.current);
+        fetchDebounceTimer.current = null;
+      }
+    };
+  }, [filtersKey, fetchItems]);
 
   const handlePublish = async (blogId: string) => {
     try {
       const response = await api.blogs.publish(blogId);
-      
       if (response.success) {
-        toast({
-          title: 'Blog published',
-          description: 'Blog post is now live',
-        });
-        await fetchBlogData(); // Refresh data
+        toast({ title: 'Blog published', description: 'Blog post is now live' });
+        await fetchBlogData();
+      } else {
+        toast({ title: 'Error', description: response.message || 'Failed to publish blog', variant: 'destructive' });
       }
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to publish blog',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to publish blog';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
 
   const handleArchive = async (blogId: string) => {
     try {
       const response = await api.blogs.archive(blogId);
-      
       if (response.success) {
-        toast({
-          title: 'Blog archived',
-          description: 'Blog post has been archived',
-        });
-        await fetchBlogData(); // Refresh data
+        toast({ title: 'Blog archived', description: 'Blog post has been archived' });
+        await fetchBlogData();
       }
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to archive blog',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to archive blog';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
 
   const handleToggleFeatured = async (blogId: string) => {
     try {
       const response = await api.blogs.toggleFeatured(blogId);
-      
       if (response.success) {
         const blog = blogs.find(b => b.id === blogId);
-        toast({
-          title: blog?.featured ? 'Removed from featured' : 'Added to featured',
-          description: blog?.featured ? 'Blog is no longer featured' : 'Blog is now featured',
-        });
-        await fetchBlogData(); // Refresh data
+        toast({ title: blog?.featured ? 'Removed from featured' : 'Added to featured', description: blog?.featured ? 'Blog is no longer featured' : 'Blog is now featured' });
+        await fetchBlogData();
       }
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update blog',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update blog';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
 
   const handleDelete = async (blogId: string) => {
-    await deleteItem(blogId);
-    await fetchBlogData(); // Refresh stats after deletion
+    try {
+      await deleteItem(blogId);
+      await fetchBlogData();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to delete blog';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
+    }
+  };
+
+  // Blog creation handler with publish support
+  const handleCreateBlog = async (blogData: Partial<Blog>, publishNow: boolean = false) => {
+    try {
+      // Build a safe create payload for the API - prefer explicit typing to satisfy TS
+      const payload = ({
+        title: blogData.title ?? '',
+        excerpt: blogData.excerpt ?? '',
+        content: blogData.content ?? '',
+        tags: blogData.tags ?? [],
+        featured: !!blogData.featured,
+        seo: (blogData.seo ?? { keywords: [] }),
+        status: publishNow ? 'published' : (blogData.status ?? 'draft'),
+        readingTime: typeof blogData.readingTime === 'number' ? blogData.readingTime : undefined,
+        featuredImage: blogData.featuredImage,
+        images: blogData.images,
+      } as unknown) as import('../types').BlogCreatePayload;
+
+      const response = await api.blogs.create(payload);
+      if (response.success) {
+        toast({ title: publishNow ? 'Blog published' : 'Blog created', description: publishNow ? 'Blog post is now live' : 'Blog post has been created' });
+        await fetchBlogData();
+      } else {
+        toast({ title: 'Error', description: response.message || 'Failed to create blog', variant: 'destructive' });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to create blog';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
+    }
   };
 
   const handleViewDetails = (blog: Blog) => {
@@ -186,7 +292,8 @@ export function BlogsPage() {
     });
   };
 
-  const formatReadTime = (minutes: number) => {
+  const formatReadTime = (blog: Blog) => {
+    const minutes = typeof blog.readingTime === 'number' ? blog.readingTime : 1;
     return `${minutes} min read`;
   };
 
@@ -211,6 +318,8 @@ export function BlogsPage() {
       </div>
     );
   }
+
+  const safeBlogs = Array.isArray(blogs) ? blogs : [];
 
   return (
     <div className="space-y-6">
@@ -310,12 +419,13 @@ export function BlogsPage() {
               </SelectContent>
             </Select>
             <div className="text-sm text-muted-foreground">
-              {blogs.length} blogs
+              {safeBlogs.length} blogs
             </div>
           </div>
 
           {/* Blogs Table */}
           <div className="border rounded-lg">
+            {fetchError && <ErrorPanel title="Failed to load blogs" message={fetchError.message} status={fetchError.status} url={fetchError.url} />}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -329,7 +439,7 @@ export function BlogsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {blogs.length === 0 ? (
+                {safeBlogs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="text-muted-foreground">
@@ -338,7 +448,7 @@ export function BlogsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  blogs.map((blog) => (
+                  safeBlogs.map((blog) => (
                     <TableRow key={blog.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -356,27 +466,22 @@ export function BlogsPage() {
                       <TableCell>
                         <div>
                           <div className="font-medium">{blog.author?.name || 'Unknown'}</div>
-                          <div className="text-sm text-muted-foreground">{formatReadTime(blog.readTime)}</div>
+                          <div className="text-sm text-muted-foreground">{formatReadTime(blog)}</div>
                         </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(blog.status)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-xs">
-                          {blog.tags.slice(0, 2).map((tag) => (
+                          {(Array.isArray(blog.tags) ? blog.tags : []).slice(0, 2).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-xs">
                               {tag}
                             </Badge>
                           ))}
-                          {blog.tags.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{blog.tags.length - 2}
-                            </Badge>
-                          )}
-                        </div>
+                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-center">
-                          <span className="font-medium">{blog.views.toLocaleString()}</span>
+                          <span className="font-medium">{getViewCount(blog).toLocaleString()}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -478,14 +583,14 @@ export function BlogsPage() {
                     <div><span className="font-medium">Author:</span> {selectedBlog.author?.name || 'Unknown'}</div>
                     <div><span className="font-medium">Status:</span> {getStatusBadge(selectedBlog.status)}</div>
                     <div><span className="font-medium">Featured:</span> {selectedBlog.featured ? 'Yes' : 'No'}</div>
-                    <div><span className="font-medium">Read Time:</span> {formatReadTime(selectedBlog.readTime)}</div>
+                    <div><span className="font-medium">Read Time:</span> {formatReadTime(selectedBlog)}</div>
                   </div>
                 </div>
                 
                 <div>
                   <h4 className="font-semibold mb-2">Metrics & Dates</h4>
                   <div className="space-y-2 text-sm">
-                    <div><span className="font-medium">Views:</span> {selectedBlog.views.toLocaleString()}</div>
+                    <div><span className="font-medium">Views:</span> {getViewCount(selectedBlog).toLocaleString()}</div>
                     <div><span className="font-medium">Created:</span> {formatDate(selectedBlog.createdAt)}</div>
                     <div><span className="font-medium">Updated:</span> {formatDate(selectedBlog.updatedAt)}</div>
                     <div><span className="font-medium">Published:</span> {selectedBlog.publishedAt ? formatDate(selectedBlog.publishedAt) : 'Not published'}</div>

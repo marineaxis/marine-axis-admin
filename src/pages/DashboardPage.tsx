@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table';
 
 import { useAuth } from '../context/AuthContext';
-import { Analytics, Provider, Job, Blog, Approval } from '../types';
+import { Analytics, Provider, Job, Blog, Approval, User } from '../types';
 import api from '../lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -49,6 +49,7 @@ const DEFAULT_ANALYTICS_STATE: Analytics = {
   categoryStats: [],
   topLocations: [],
   recentActivity: [],
+  error: '',
 };
 
 interface StatCard {
@@ -60,8 +61,19 @@ interface StatCard {
   color: string;
 }
 
+const formatLocation = (loc: unknown): string => {
+  if (!loc) return 'N/A';
+  if (typeof loc === 'string') return loc;
+  if (typeof loc === 'object') {
+    const obj = loc as { coordinates?: unknown; city?: unknown };
+    if (Array.isArray(obj.coordinates)) return obj.coordinates.join(', ');
+    if (typeof obj.city === 'string') return obj.city;
+  }
+  return 'N/A';
+};
+
 export function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   
   const [analytics, setAnalytics] = useState<Analytics>(DEFAULT_ANALYTICS_STATE);
@@ -71,70 +83,144 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch admin dashboard data
-      const analyticsResponse = await api.analytics.adminDashboard();
-      if (analyticsResponse.success) {
-        setAnalytics(prev => ({
-          ...prev,
-          ...analyticsResponse.data,
-          // Explicitly merge nested objects to prevent them from being overwritten by undefined
-          monthlyStats: {
-            ...prev.monthlyStats,
-            ...(analyticsResponse.data.monthlyStats || {}),
-          },
-          // Ensure arrays are defaulted to empty if API returns null/undefined
-          categoryStats: analyticsResponse.data.categoryStats || [],
-          topLocations: analyticsResponse.data.topLocations || [],
-          recentActivity: analyticsResponse.data.recentActivity || [],
-        }));
-      }
-
-      // Fetch recent providers
-      const providersResponse = await api.providers.list({ 
-        limit: 5, 
-        sortBy: 'createdAt', 
-        sortOrder: 'desc' 
-      });
-      if (providersResponse.success) {
-        setRecentProviders(providersResponse.data);
-      }
-
-      // Fetch recent jobs
-      const jobsResponse = await api.jobs.list({ 
-        limit: 5, 
-        sortBy: 'createdAt', 
-        sortOrder: 'desc' 
-      });
-      if (jobsResponse.success) {
-        setRecentJobs(jobsResponse.data);
-      }
-
-      // Fetch pending approvals
-      const approvalsResponse = await api.approvals.list({ 
-        status: 'pending',
-        limit: 10 
-      });
-      if (approvalsResponse.success) {
-        setPendingApprovals(approvalsResponse.data);
-      }
-
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to load dashboard data',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+    if (!isAuthenticated || user?.role !== 'admin') return;
+    const asProvider = (raw: unknown): Provider => {
+      const obj = raw as Record<string, unknown>;
+      return {
+        id: String(obj.id || obj._id || ''),
+        name: typeof obj.name === 'string' ? obj.name : 'Unnamed',
+        email: typeof obj.email === 'string' ? obj.email : '',
+        phone: typeof obj.phone === 'string' ? obj.phone : '',
+        location: formatLocation(obj.location),
+        description: typeof obj.description === 'string' ? obj.description : '',
+        services: Array.isArray(obj.services) ? obj.services as string[] : [],
+        categoryIds: Array.isArray(obj.categoryIds) ? obj.categoryIds as string[] : [],
+        status: (['pending','approved','rejected','suspended'].includes(String(obj.status))) ? obj.status as Provider['status'] : 'pending',
+        featured: Boolean(obj.featured),
+        logo: typeof obj.logo === 'string' ? obj.logo : undefined,
+        images: Array.isArray(obj.images) ? obj.images as string[] : [],
+        website: typeof obj.website === 'string' ? obj.website : undefined,
+        socialLinks: (typeof obj.socialLinks === 'object' && obj.socialLinks) ? obj.socialLinks as { linkedin?: string; facebook?: string; twitter?: string; } : {},
+        verificationDocuments: Array.isArray(obj.verificationDocuments) ? obj.verificationDocuments as string[] : [],
+        rating: typeof obj.rating === 'number' ? obj.rating : 0,
+        reviewCount: typeof obj.reviewCount === 'number' ? obj.reviewCount : 0,
+        createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : new Date().toISOString(),
+        updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : (typeof obj.createdAt === 'string' ? obj.createdAt : new Date().toISOString()),
+      };
+    };
+    const asJob = (raw: unknown): Job => {
+      const obj = raw as Record<string, unknown>;
+      return {
+        id: String(obj.id || obj._id || ''),
+        title: typeof obj.title === 'string' ? obj.title : 'Untitled Job',
+        description: typeof obj.description === 'string' ? obj.description : '',
+        providerId: typeof obj.providerId === 'string' ? obj.providerId : '',
+        provider: obj.provider as Provider | undefined,
+        categoryIds: Array.isArray(obj.categoryIds) ? obj.categoryIds as string[] : [],
+        location: formatLocation(obj.location),
+        salaryRange: (typeof obj.salaryRange === 'object' && obj.salaryRange) ? obj.salaryRange as Job['salaryRange'] : { min: 0, max: 0, currency: 'USD' },
+        requirements: Array.isArray(obj.requirements) ? obj.requirements as string[] : [],
+        benefits: Array.isArray(obj.benefits) ? obj.benefits as string[] : [],
+        type: (['full-time','part-time','contract','internship'].includes(String(obj.type))) ? obj.type as Job['type'] : 'full-time',
+        remote: Boolean(obj.remote),
+        urgency: (['low','medium','high'].includes(String(obj.urgency))) ? obj.urgency as Job['urgency'] : 'low',
+        status: (['draft','published','closed','paused'].includes(String(obj.status))) ? obj.status as Job['status'] : 'draft',
+        expiresAt: typeof obj.expiresAt === 'string' ? obj.expiresAt : new Date().toISOString(),
+        applications: typeof obj.applications === 'number' ? obj.applications : 0,
+        createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : new Date().toISOString(),
+        updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : (typeof obj.createdAt === 'string' ? obj.createdAt : new Date().toISOString()),
+      };
+    };
+    const asApproval = (raw: unknown): Approval => {
+      const obj = raw as Record<string, unknown>;
+      return {
+        id: String(obj.id || obj._id || ''),
+        type: (['provider_registration','provider_edit','job_posting','blog_post'].includes(String(obj.type))) ? obj.type as Approval['type'] : 'provider_registration',
+        entityId: typeof obj.entityId === 'string' ? obj.entityId : '',
+        entity: obj.entity as Provider | Job | Blog | undefined,
+        changes: (typeof obj.changes === 'object' && obj.changes) ? obj.changes as Record<string, unknown> : {},
+        requestedBy: typeof obj.requestedBy === 'string' ? obj.requestedBy : '',
+        requester: obj.requester as User | Provider | undefined,
+        status: (['pending','approved','rejected'].includes(String(obj.status))) ? obj.status as Approval['status'] : 'pending',
+        priority: (['low','medium','high'].includes(String(obj.priority))) ? obj.priority as Approval['priority'] : 'low',
+        reviewerId: typeof obj.reviewerId === 'string' ? obj.reviewerId : undefined,
+        reviewer: obj.reviewer as User | undefined,
+        reviewNotes: typeof obj.reviewNotes === 'string' ? obj.reviewNotes : undefined,
+        metadata: (typeof obj.metadata === 'object' && obj.metadata) ? obj.metadata as Record<string, unknown> : {},
+        createdAt: typeof obj.createdAt === 'string' ? obj.createdAt : new Date().toISOString(),
+        updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : (typeof obj.createdAt === 'string' ? obj.createdAt : new Date().toISOString()),
+      };
+    };
+    // Type for admin dashboard response
+    interface AdminDashboardData {
+      providers?: { total?: number };
+      customers?: { total?: number };
+      admins?: { total?: number };
+      pendingProviders?: unknown[];
+      // ...add more fields as needed
     }
-  };
+    const run = async () => {
+      setLoading(true);
+      try {
+        const adminDash = await api.analytics.adminDashboard();
+        if (adminDash.success) {
+          const dashData = adminDash.data as AdminDashboardData;
+          setAnalytics(prev => ({
+            ...prev,
+            totalProviders: dashData.providers?.total ?? prev.totalProviders,
+            totalUsers: (dashData.customers?.total ?? 0) + (dashData.providers?.total ?? 0) + (dashData.admins?.total ?? 0),
+            pendingApprovals: Array.isArray(dashData.pendingProviders) ? dashData.pendingProviders.length : prev.pendingApprovals,
+          }));
+          if (Array.isArray(dashData.pendingProviders)) {
+            const normalized = (dashData.pendingProviders as unknown[]).map(asProvider) as Provider[];
+            setRecentProviders(normalized.slice(0,5));
+          }
+        }
+        const providersResponse = await api.providers.list({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' });
+        if (providersResponse.success) {
+          const rawArr = Array.isArray((providersResponse as unknown as { data?: { data: unknown[] } }).data?.data)
+            ? (providersResponse as unknown as { data?: { data: unknown[] } }).data!.data
+            : (Array.isArray((providersResponse as { data: unknown }).data) ? (providersResponse as { data: unknown[] }).data : []);
+          const normalized = (rawArr as unknown[]).map(asProvider) as Provider[];
+          setRecentProviders(normalized);
+        }
+        const jobsResponse = await api.jobs.list({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' });
+        if (jobsResponse.success) {
+          const rawArr = Array.isArray((jobsResponse as unknown as { data?: { data: unknown[] } }).data?.data)
+            ? (jobsResponse as unknown as { data?: { data: unknown[] } }).data!.data
+            : (Array.isArray((jobsResponse as { data: unknown }).data) ? (jobsResponse as { data: unknown[] }).data : []);
+          const normalized = (rawArr as unknown[]).map(asJob) as Job[];
+          setRecentJobs(normalized);
+        }
+        if (api.approvals?.getPending) {
+          // Approvals endpoint not implemented in backend; skipping fetch to avoid 404 spam.
+          // const approvalsResponse = await api.approvals.getPending({ limit: 10 });
+          // if (approvalsResponse.success) { /* normalization removed */ }
+          setPendingApprovals([]);
+        }
+      } catch (error: unknown) {
+        let message = 'Failed to load dashboard data';
+        let status = '';
+        if (error instanceof Error) {
+          message = error.message;
+        }
+        if (typeof error === 'object' && error && 'response' in error) {
+          // @ts-expect-error
+          status = error.response?.status;
+        }
+        toast({ title: 'Dashboard Error', description: `${message}${status ? ` (Status: ${status})` : ''}`, variant: 'destructive' });
+        setAnalytics(prev => ({ ...prev, error: `${message}${status ? ` (Status: ${status})` : ''}` }));
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [isAuthenticated, user, toast]);
+
+  // Show error in UI if present
+  if (analytics.error) {
+    return <div className="p-8 text-center text-destructive">{analytics.error}</div>;
+  }
 
   const handleExportData = async () => {
     try {
@@ -145,10 +231,11 @@ export function DashboardPage() {
           description: 'Your data export has been queued for download.',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to export data';
       toast({
         title: 'Export Error',
-        description: error.message || 'Failed to export data',
+        description: message,
         variant: 'destructive',
       });
     }
@@ -245,7 +332,47 @@ export function DashboardPage() {
     );
   }
 
-  const statCards = getStatCards();
+  if (!isAuthenticated && !isLoading) {
+    return <div className="p-8 text-center text-destructive">You must be logged in as an admin to view the dashboard.</div>;
+  }
+  if (user && user.role !== 'admin') {
+    return <div className="p-8 text-center text-destructive">Access denied. Admins only.</div>;
+  }
+
+  const statCards = [
+    {
+      title: 'Total Providers',
+      value: analytics.totalProviders ?? recentProviders.length,
+      change: `+${analytics.monthlyStats.providers ?? 0} this month`,
+      trend: 'up',
+      icon: Building2,
+      color: 'text-primary',
+    },
+    {
+      title: 'Active Jobs',
+      value: analytics.activeJobs ?? recentJobs.filter(j => j.status === 'published').length,
+      change: `+${analytics.monthlyStats.jobs ?? 0} this month`,
+      trend: 'up',
+      icon: Briefcase,
+      color: 'text-success',
+    },
+    {
+      title: 'Published Blogs',
+      value: analytics.publishedBlogs ?? 0,
+      change: `+${analytics.monthlyStats.blogs ?? 0} this month`,
+      trend: 'up',
+      icon: FileText,
+      color: 'text-accent',
+    },
+    {
+      title: 'Pending Approvals',
+      value: analytics.pendingApprovals ?? pendingApprovals.length,
+      change: 'Require attention',
+      trend: (analytics.pendingApprovals ?? pendingApprovals.length) > 10 ? 'up' : 'neutral',
+      icon: Clock,
+      color: (analytics.pendingApprovals ?? pendingApprovals.length) > 10 ? 'text-warning' : 'text-muted-foreground',
+    },
+  ] as StatCard[];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -298,20 +425,20 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentProviders.map((provider) => (
+              {recentProviders.length > 0 ? recentProviders.map(provider => (
                 <div key={provider.id} className="flex items-center space-x-4">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                     <Building2 className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">{provider.name}</p>
+                    <p className="text-sm font-medium">{provider.name || 'Unnamed Provider'}</p>
                     <p className="text-xs text-muted-foreground">{provider.location}</p>
                   </div>
                   <Badge variant={provider.status === 'approved' ? 'default' : 'secondary'}>
-                    {provider.status}
+                    {provider.status || 'pending'}
                   </Badge>
                 </div>
-              ))}
+              )) : <p className="text-sm text-muted-foreground">No providers found</p>}
             </div>
           </CardContent>
         </Card>
@@ -326,77 +453,31 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentJobs.map((job) => (
+              {recentJobs.length > 0 ? recentJobs.map(job => (
                 <div key={job.id} className="flex items-center space-x-4">
                   <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
                     <Briefcase className="h-5 w-5 text-success" />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">{job.title}</p>
+                    <p className="text-sm font-medium">{job.title || 'Untitled Job'}</p>
                     <p className="text-xs text-muted-foreground">{job.location}</p>
                   </div>
                   <Badge variant={job.status === 'published' ? 'default' : 'secondary'}>
-                    {job.status}
+                    {job.status || 'draft'}
                   </Badge>
                 </div>
-              ))}
+              )) : <p className="text-sm text-muted-foreground">No jobs found</p>}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Pending Approvals */}
-      {pendingApprovals.length > 0 && (
+      {/* Pending Approvals disabled until backend endpoint exists */}
+      {/* {pendingApprovals.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <AlertCircle className="mr-2 h-5 w-5 text-warning" />
-              Pending Approvals
-            </CardTitle>
-            <CardDescription>
-              Items that require your review
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendingApprovals.map((approval) => (
-                  <TableRow key={approval.id}>
-                    <TableCell>
-                      {getApprovalTypeLabel(approval.type)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {(approval.entity as any)?.name || (approval.entity as any)?.title || 'Unknown'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getPriorityColor(approval.priority) as any}>
-                        {approval.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(approval.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="outline">
-                        Review
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
+          ...approvals table...
         </Card>
-      )}
+      )} */}
     </div>
   );
 }

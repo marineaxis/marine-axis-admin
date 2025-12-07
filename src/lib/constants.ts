@@ -205,7 +205,8 @@ export const DATE_FORMATS = {
 
 export const VALIDATION_RULES = {
   EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  PHONE: /^\+?[\d\s\-\(\)]+$/,
+  // Allow digits, spaces, plus, hyphen and parentheses (parentheses don't need escaping inside char class)
+  PHONE: /^\+?[\d\s\-()]+$/,
   URL: /^https?:\/\/.+/,
   PASSWORD: {
     MIN_LENGTH: 8,

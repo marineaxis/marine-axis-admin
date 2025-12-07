@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-import { Category, CreateCategoryForm } from '../types';
+import { Category, CreateCategoryForm, TableFilters, ApiResponse, PaginatedResponse } from '../types';
 import useCRUD from '../hooks/useCRUD';
 import api from '../lib/api';
 
@@ -44,6 +44,43 @@ export function CategoriesPage() {
   const [editForm, setEditForm] = useState({ name: '', description: '', icon: '', parentId: undefined, order: undefined, active: true });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
+  // Adapter to normalize api.categories to the shapes expected by useCRUD
+  const categoriesApi = {
+    list: async (params?: TableFilters): Promise<PaginatedResponse<Category>> => {
+      const res = await api.categories.list(params) as unknown;
+      // If already a paginated response, return directly
+      if (res && typeof res === 'object' && (res as any).pagination && Array.isArray((res as any).data)) {
+        return res as PaginatedResponse<Category>;
+      }
+
+      // If wrapped as ApiResponse with data array and optional pagination
+      if (res && typeof res === 'object' && (res as any).data && Array.isArray((res as any).data)) {
+        const r = res as unknown as ApiResponse<{ data: Category[]; pagination?: PaginatedResponse<Category>['pagination'] }>;
+        return {
+          success: true,
+          data: r.data.data,
+          pagination: r.data.pagination ?? { page: 1, limit: 25, total: r.data.data.length, totalPages: 1, hasNext: false, hasPrev: false },
+          message: r.message,
+        } as PaginatedResponse<Category>;
+      }
+
+      // Fallback: attempt to cast (low-risk for dev)
+      return res as PaginatedResponse<Category>;
+    },
+    get: async (id: string): Promise<ApiResponse<Category>> => {
+      return (await api.categories.get(id)) as ApiResponse<Category>;
+    },
+    create: async (data?: unknown): Promise<ApiResponse<Category>> => {
+      return (await api.categories.create(data as Record<string, unknown>)) as ApiResponse<Category>;
+    },
+    update: async (id: string, data?: unknown): Promise<ApiResponse<Category>> => {
+      return (await api.categories.update(id, data as Record<string, unknown>)) as ApiResponse<Category>;
+    },
+    delete: async (id: string): Promise<ApiResponse<void>> => {
+      return (await api.categories.delete(id)) as unknown as ApiResponse<void>;
+    },
+  };
+
   // Use CRUD hook for category management
   const {
     items: categories,
@@ -56,9 +93,11 @@ export function CategoriesPage() {
     updateItem,
     deleteItem,
     setFilters,
+    // pull current filters from hook state so we can react to changes
+    filters,
   } = useCRUD<Category>({
     resource: 'categories',
-    api: api.categories,
+    api: categoriesApi,
     messages: {
       created: 'Category created successfully',
       updated: 'Category updated successfully',
@@ -66,9 +105,52 @@ export function CategoriesPage() {
     },
   });
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  // Debounced fetch that reacts to the hook filters (prevents refresh storms)
+  const fetchDebounceTimer = React.useRef<number | null>(null);
+  const lastFetchedFiltersKeyRef = React.useRef<string | null>(null);
+
+  const filtersKey = React.useMemo(() => {
+    try { return JSON.stringify(filters || {}); } catch { return String(filters || ''); }
+  }, [filters]);
+
+  React.useEffect(() => {
+    if (!filtersKey) return;
+    if (lastFetchedFiltersKeyRef.current === filtersKey) return;
+
+    if (fetchDebounceTimer.current) {
+      clearTimeout(fetchDebounceTimer.current);
+      fetchDebounceTimer.current = null;
+    }
+
+    fetchDebounceTimer.current = window.setTimeout(async () => {
+      let parsedFilters: TableFilters | undefined;
+      try { parsedFilters = JSON.parse(filtersKey) as TableFilters; } catch { parsedFilters = undefined; }
+      if (!parsedFilters) return;
+
+      try {
+        const result = await fetchItems(parsedFilters);
+        if (result) {
+          lastFetchedFiltersKeyRef.current = filtersKey;
+        }
+      } catch (error) {
+        // fetchItems handles toasts; swallow here
+      }
+    }, 200);
+
+    return () => {
+      if (fetchDebounceTimer.current) {
+        clearTimeout(fetchDebounceTimer.current);
+        fetchDebounceTimer.current = null;
+      }
+    };
+  }, [filtersKey, fetchItems]);
+
+  // Wire search box to hook filters so UI controls drive the fetches
+  React.useEffect(() => {
+    const next: Partial<TableFilters> = {};
+    if (searchQuery.trim()) next.search = searchQuery.trim();
+    setFilters(next);
+  }, [searchQuery, setFilters]);
 
   // Filter categories
   const filteredCategories = categories.filter(category =>
