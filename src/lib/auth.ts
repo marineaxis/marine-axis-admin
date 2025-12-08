@@ -68,27 +68,18 @@ export class AuthManager {
 
   static getUserRole(): Role | null {
     const token = this.getDecodedToken();
-    return token?.role || null;
+    return token?.role ?? null;
   }
 
-  static hasRole(requiredRole: 'superadmin' | 'admin'): boolean {
+  static hasRole(requiredRole: Role): boolean {
     const userRole = this.getUserRole();
     if (!userRole) return false;
-
-    // Super admin has access to everything
-    if (userRole === 'superadmin') return true;
-    
-    // Admin can only access admin-level features
     return userRole === requiredRole;
   }
 
-  static canAccess(requiredRoles: ('superadmin' | 'admin')[]): boolean {
+  static canAccess(requiredRoles: Array<Role>): boolean {
     const userRole = this.getUserRole();
     if (!userRole) return false;
-
-    // Super admin has access to everything
-    if (userRole === 'superadmin') return true;
-
     return requiredRoles.includes(userRole);
   }
 
@@ -139,8 +130,9 @@ export const passwordValidation = {
     return /\d/.test(password);
   },
 
+  // Simplified: detect any non-alphanumeric, non-space character as a special char
   hasSpecialChar: (password: string): boolean => {
-    return /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    return /[^A-Za-z0-9\s]/.test(password);
   },
 
   isValid: (password: string): boolean => {
@@ -194,8 +186,9 @@ export const sanitize = {
     return input.toLowerCase().trim();
   },
 
+  // Simplified phone sanitization regex to avoid unnecessary escapes
   phone: (input: string): string => {
-    return input.replace(/[^\d\+\-\(\)\s]/g, '');
+    return input.replace(/[^0-9+\-()\s]/g, '');
   },
 
   url: (input: string): string => {
@@ -211,43 +204,43 @@ export const sanitize = {
 // RBAC helper functions
 export const permissions = {
   // Admin management
-  canManageAdmins: (): boolean => AuthManager.hasRole('superadmin'),
-  canCreateAdmins: (): boolean => AuthManager.hasRole('superadmin'),
-  canDeleteAdmins: (): boolean => AuthManager.hasRole('superadmin'),
+  canManageAdmins: (): boolean => AuthManager.hasRole('admin'),
+  canCreateAdmins: (): boolean => AuthManager.hasRole('admin'),
+  canDeleteAdmins: (): boolean => AuthManager.hasRole('admin'),
 
   // Provider management
-  canManageProviders: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
-  canApproveProviders: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
-  canDeleteProviders: (): boolean => AuthManager.hasRole('superadmin'),
+  canManageProviders: (): boolean => AuthManager.canAccess(['admin']),
+  canApproveProviders: (): boolean => AuthManager.canAccess(['admin']),
+  canDeleteProviders: (): boolean => AuthManager.hasRole('admin'),
 
   // Job management
-  canManageJobs: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
-  canDeleteJobs: (): boolean => AuthManager.hasRole('superadmin'),
+  canManageJobs: (): boolean => AuthManager.canAccess(['admin']),
+  canDeleteJobs: (): boolean => AuthManager.hasRole('admin'),
 
   // Blog management
-  canManageBlogs: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
-  canDeleteBlogs: (): boolean => AuthManager.hasRole('superadmin'),
+  canManageBlogs: (): boolean => AuthManager.canAccess(['admin']),
+  canDeleteBlogs: (): boolean => AuthManager.hasRole('admin'),
 
   // Category management
-  canManageCategories: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
-  canDeleteCategories: (): boolean => AuthManager.hasRole('superadmin'),
+  canManageCategories: (): boolean => AuthManager.canAccess(['admin']),
+  canDeleteCategories: (): boolean => AuthManager.hasRole('admin'),
 
   // Approval management
-  canManageApprovals: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canManageApprovals: (): boolean => AuthManager.canAccess(['admin']),
 
   // Email templates
-  canManageEmailTemplates: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canManageEmailTemplates: (): boolean => AuthManager.canAccess(['admin']),
 
   // Settings
-  canManageSettings: (): boolean => AuthManager.hasRole('superadmin'),
-  canViewSettings: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
+  canManageSettings: (): boolean => AuthManager.hasRole('admin'),
+  canViewSettings: (): boolean => AuthManager.canAccess(['admin']),
 
   // Analytics
-  canViewAnalytics: (): boolean => AuthManager.canAccess(['superadmin', 'admin']),
-  canExportData: (): boolean => AuthManager.hasRole('superadmin'),
+  canViewAnalytics: (): boolean => AuthManager.canAccess(['admin']),
+  canExportData: (): boolean => AuthManager.hasRole('admin'),
 
   // Audit logs
-  canViewAuditLogs: (): boolean => AuthManager.hasRole('superadmin'),
+  canViewAuditLogs: (): boolean => AuthManager.hasRole('admin'),
 };
 
 export default AuthManager;

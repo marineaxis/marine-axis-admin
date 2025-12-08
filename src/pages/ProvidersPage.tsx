@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, CheckCircle, XCircle, Star } from 'lucide-react';
 
@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-import { Provider } from '../types';
+import { Provider, TableFilters, ApiResponse, PaginatedResponse } from '../types';
 import useCRUD from '../hooks/useCRUD';
 import api from '../lib/api';
 
@@ -33,6 +33,25 @@ export function ProvidersPage() {
   });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
+  // Create a small typed wrapper around api.providers to satisfy useCRUD generics
+  const providersApi = {
+    list: async (params?: TableFilters): Promise<PaginatedResponse<Provider>> => {
+      return (await api.providers.list(params)) as PaginatedResponse<Provider>;
+    },
+    get: async (id: string): Promise<ApiResponse<Provider>> => {
+      return (await api.providers.get(id)) as ApiResponse<Provider>;
+    },
+    create: async (data?: unknown): Promise<ApiResponse<Provider>> => {
+      return (await api.providers.create(data as Record<string, unknown>)) as ApiResponse<Provider>;
+    },
+    update: async (id: string, data?: unknown): Promise<ApiResponse<Provider>> => {
+      return (await api.providers.update(id, data as Record<string, unknown>)) as ApiResponse<Provider>;
+    },
+    delete: async (id: string): Promise<ApiResponse<void>> => {
+      return (await api.providers.delete(id)) as unknown as ApiResponse<void>;
+    },
+  };
+
   // Use CRUD hook for provider management
   const {
     items: providers,
@@ -43,33 +62,70 @@ export function ProvidersPage() {
     updateItem,
     deleteItem,
     setFilters,
+    // pull current filters from hook state so we can react to changes
+    filters,
   } = useCRUD<Provider>({
     resource: 'providers',
-    api: api.providers,
+    api: providersApi,
     messages: {
       updated: 'Provider updated successfully',
       deleted: 'Provider deleted successfully',
     },
   });
 
-  // Fetch providers on component mount
-  React.useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  // Debounced fetch that reacts to the hook filters (prevents refresh storms)
+  const fetchDebounceTimer = useRef<number | null>(null);
+  const lastFetchedFiltersKeyRef = useRef<string | null>(null);
+
+  const filtersKey = React.useMemo(() => {
+    try { return JSON.stringify(filters || {}); } catch { return String(filters || ''); }
+  }, [filters]);
+
+  useEffect(() => {
+    if (!filtersKey) return;
+    if (lastFetchedFiltersKeyRef.current === filtersKey) return;
+
+    if (fetchDebounceTimer.current) {
+      clearTimeout(fetchDebounceTimer.current);
+      fetchDebounceTimer.current = null;
+    }
+
+    fetchDebounceTimer.current = window.setTimeout(async () => {
+      let parsedFilters: TableFilters | undefined;
+      try { parsedFilters = JSON.parse(filtersKey) as TableFilters; } catch { parsedFilters = undefined; }
+      if (!parsedFilters) return;
+
+      try {
+        const result = await fetchItems(parsedFilters);
+        if (result) {
+          lastFetchedFiltersKeyRef.current = filtersKey;
+        }
+      } catch (error) {
+        // fetchItems handles toasts; swallow here to avoid extra handling
+      }
+    }, 200);
+
+    return () => {
+      if (fetchDebounceTimer.current) {
+        clearTimeout(fetchDebounceTimer.current);
+        fetchDebounceTimer.current = null;
+      }
+    };
+  }, [filtersKey, fetchItems]);
 
   // Apply filters when search or filter values change
   React.useEffect(() => {
-    const filters: any = {};
+    const filtersToSet: Partial<TableFilters> = {};
     
     if (searchQuery.trim()) {
-      filters.search = searchQuery.trim();
+      filtersToSet.search = searchQuery.trim();
     }
     
     if (statusFilter !== 'all') {
-      filters.status = statusFilter;
+      filtersToSet.status = statusFilter;
     }
     
-    setFilters(filters);
+    setFilters(filtersToSet);
   }, [searchQuery, statusFilter, setFilters]);
 
   // Filter providers

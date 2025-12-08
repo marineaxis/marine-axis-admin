@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ 
   children, 
-  roles = ['superadmin', 'admin'], 
+  roles = ['admin'] as Role[], 
   requireAuth = true 
 }: ProtectedRouteProps) {
   const { isAuthenticated, canAccess, isLoading } = useAuth();

@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
-import { CreateBlogForm } from '../types';
+import { CreateBlogForm, BlogCreatePayload } from '../types';
+import api from '../lib/api';
 
 export function CreateBlogPage() {
   const navigate = useNavigate();
@@ -52,28 +53,35 @@ export function CreateBlogPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-
-    // Auto-generate SEO fields
-    if (field === 'title' && !formData.seo.metaTitle) {
-      setFormData(prev => ({
-        ...prev,
-        seo: { ...prev.seo, metaTitle: value }
-      }));
-    }
-    if (field === 'excerpt' && !formData.seo.metaDescription) {
-      setFormData(prev => ({
-        ...prev,
-        seo: { ...prev.seo, metaDescription: value }
-      }));
-    }
+  // Prefer explicit, typed handlers to satisfy lint rules
+  const handleTitleChange = (value: string) => {
+    setFormData(prev => {
+      const next = { ...prev, title: value };
+      if (!prev.seo.metaTitle) next.seo = { ...prev.seo, metaTitle: value };
+      return next;
+    });
+    if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
   };
 
-  const handleSeoChange = (field: string, value: string) => {
+  const handleExcerptChange = (value: string) => {
+    setFormData(prev => {
+      const next = { ...prev, excerpt: value };
+      if (!prev.seo.metaDescription) next.seo = { ...prev.seo, metaDescription: value };
+      return next;
+    });
+    if (errors.excerpt) setErrors(prev => ({ ...prev, excerpt: '' }));
+  };
+
+  const handleContentChange = (value: string) => {
+    setFormData(prev => ({ ...prev, content: value }));
+    if (errors.content) setErrors(prev => ({ ...prev, content: '' }));
+  };
+
+  const handleFeaturedChange = (checked: boolean) => {
+    setFormData(prev => ({ ...prev, featured: checked }));
+  };
+
+  const handleSeoChange = (field: 'metaTitle' | 'metaDescription', value: string) => {
     setFormData(prev => ({
       ...prev,
       seo: { ...prev.seo, [field]: value }
@@ -123,9 +131,7 @@ export function CreateBlogPage() {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleCreateBlog = async (formData: CreateBlogForm, publishNow: boolean) => {
     if (!validateForm()) {
       return;
     }
@@ -133,28 +139,34 @@ export function CreateBlogPage() {
     setIsLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const blogData = {
+      const blogData: BlogCreatePayload = {
         ...formData,
+        tags: Array.isArray(formData.tags) ? formData.tags.map(String) : [],
+        seo: {
+          metaTitle: formData.seo.metaTitle || '',
+          metaDescription: formData.seo.metaDescription || '',
+          keywords: Array.isArray(formData.seo.keywords) ? formData.seo.keywords.map(String) : [],
+        },
         slug: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-        readTime: Math.ceil(formData.content.split(' ').length / 200), // Estimate reading time
+        readingTime: Math.max(1, Math.ceil(formData.content.split(/\s+/).filter(Boolean).length / 200)),
+        status: publishNow ? 'published' : 'draft',
       };
 
-      console.log('Creating blog:', blogData);
+      const res = await api.blogs.create(blogData);
+      if (!res.success) {
+        throw new Error(res.message || 'Failed to create blog');
+      }
 
       toast({
-        title: 'Blog created successfully',
-        description: `${formData.title} has been saved as a draft`,
+        title: `Blog ${publishNow ? 'published' : 'saved as draft'} successfully`,
+        description: `${formData.title} has been ${publishNow ? 'published' : 'saved as a draft'}`,
       });
 
       navigate('/blogs');
-    } catch (error) {
-      toast({
-        title: 'Error creating blog',
-        description: 'Please try again later',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Please try again later';
+      toast({ title: 'Error creating blog', description: message, variant: 'destructive' });
+      console.error('Create blog error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -188,7 +200,7 @@ export function CreateBlogPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
         {/* Basic Content */}
         <Card>
           <CardHeader>
@@ -234,7 +246,7 @@ export function CreateBlogPage() {
                 id="title"
                 placeholder="Enter an engaging blog title"
                 value={formData.title}
-                onChange={(e) => handleInputChange('title', e.target.value)}
+                onChange={(e) => handleTitleChange(e.target.value)}
                 className={errors.title ? 'border-destructive' : ''}
               />
               {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
@@ -250,7 +262,7 @@ export function CreateBlogPage() {
                 placeholder="Write a compelling excerpt that summarizes your post"
                 rows={3}
                 value={formData.excerpt}
-                onChange={(e) => handleInputChange('excerpt', e.target.value)}
+                onChange={(e) => handleExcerptChange(e.target.value)}
                 className={errors.excerpt ? 'border-destructive' : ''}
               />
               {errors.excerpt && <p className="text-sm text-destructive">{errors.excerpt}</p>}
@@ -266,7 +278,7 @@ export function CreateBlogPage() {
                 placeholder="Write your blog content here..."
                 rows={12}
                 value={formData.content}
-                onChange={(e) => handleInputChange('content', e.target.value)}
+                onChange={(e) => handleContentChange(e.target.value)}
                 className={errors.content ? 'border-destructive' : ''}
               />
               {errors.content && <p className="text-sm text-destructive">{errors.content}</p>}
@@ -322,7 +334,7 @@ export function CreateBlogPage() {
               <Switch
                 id="featured"
                 checked={formData.featured}
-                onCheckedChange={(checked) => handleInputChange('featured', checked)}
+                onCheckedChange={(checked) => handleFeaturedChange(Boolean(checked))}
               />
               <Label htmlFor="featured">Feature this blog post</Label>
             </div>
@@ -426,9 +438,11 @@ export function CreateBlogPage() {
 
         {/* Submit Buttons */}
         <div className="flex items-center gap-4">
-          <Button type="submit" disabled={isLoading} className="min-w-32">
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="button" onClick={() => handleCreateBlog(formData, false)}>
             Save as Draft
+          </Button>
+          <Button type="button" variant="default" onClick={() => handleCreateBlog(formData, true)}>
+            Publish
           </Button>
           <Button
             type="button"

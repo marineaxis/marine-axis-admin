@@ -4,7 +4,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'superadmin' | 'admin' | 'provider';
+  role: Role;
   avatar?: string;
   isActive?: boolean;
   createdAt: string;
@@ -96,8 +96,8 @@ export interface Blog {
     metaDescription?: string;
     keywords: string[];
   };
-  readTime: number;
-  views: number;
+  readingTime: number; // minutes
+  viewCount?: number; // backend field name
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -108,7 +108,7 @@ export interface Approval {
   type: 'provider_registration' | 'provider_edit' | 'job_posting' | 'blog_post';
   entityId: string;
   entity?: Provider | Job | Blog;
-  changes?: Record<string, any>;
+  changes?: Record<string, unknown>;
   requestedBy: string;
   requester?: User | Provider;
   status: 'pending' | 'approved' | 'rejected';
@@ -116,7 +116,7 @@ export interface Approval {
   reviewerId?: string;
   reviewer?: User;
   reviewNotes?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -167,6 +167,7 @@ export interface Analytics {
     description: string;
     timestamp: string;
   }>;
+  error?: string; // Add error field for dashboard error reporting
 }
 
 export interface Settings {
@@ -211,22 +212,22 @@ export interface AuditLog {
   action: string;
   resource: string;
   resourceId?: string;
-  changes?: Record<string, any>;
+  changes?: Record<string, unknown>;
   ipAddress: string;
   userAgent: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }
 
 // API Response types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T> {
   data: T;
   message?: string;
   success: boolean;
   errors?: string[];
 }
 
-export interface PaginatedResponse<T = any> {
+export interface PaginatedResponse<T> {
   data: T[];
   pagination: {
     page: number;
@@ -251,13 +252,13 @@ export interface CreateUserForm {
   name: string;
   email: string;
   password: string;
-  role: 'superadmin' | 'admin';
+  role: 'admin';
 }
 
 export interface UpdateUserForm {
   name?: string;
   email?: string;
-  role?: 'superadmin' | 'admin';
+  role?: 'admin';
 }
 
 export interface CreateProviderForm {
@@ -308,6 +309,17 @@ export interface CreateBlogForm {
   };
 }
 
+// Payload types for API
+export interface BlogCreatePayload extends CreateBlogForm {
+  slug?: string;
+  readingTime?: number;
+  status?: 'draft' | 'published' | 'archived';
+  featuredImage?: string;
+  images?: string[];
+}
+
+export type BlogUpdatePayload = Partial<BlogCreatePayload>;
+
 export interface CreateCategoryForm {
   name: string;
   description: string;
@@ -317,7 +329,7 @@ export interface CreateCategoryForm {
 }
 
 // Utility types
-export type Role = 'superadmin' | 'admin';
+export type Role = 'superadmin' | 'admin' | 'provider' | 'customer';
 export type Status = 'active' | 'inactive' | 'pending' | 'suspended';
 export type SortOrder = 'asc' | 'desc';
 
@@ -329,13 +341,14 @@ export interface TableFilters {
   sortOrder?: SortOrder;
   page?: number;
   limit?: number;
+  [key: string]: unknown;
 }
 
-export interface TableColumn<T = any> {
+export interface TableColumn<T> {
   key: keyof T | string;
   title: string;
   sortable?: boolean;
-  render?: (value: any, record: T) => React.ReactNode;
+  render?: (value: unknown, record: T) => React.ReactNode;
   width?: string | number;
   align?: 'left' | 'center' | 'right';
 }

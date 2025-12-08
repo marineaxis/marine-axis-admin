@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 
 import { CreateJobForm } from '../types';
+import api from '../lib/api';
 
 // Mock categories for selection
 const MOCK_CATEGORIES = [
@@ -93,12 +94,13 @@ export function CreateJobPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+  function handleInputChange<K extends keyof CreateJobForm>(field: K, value: unknown) {
+    setFormData(prev => ({ ...prev, [field]: value as unknown as CreateJobForm[K] } as CreateJobForm));
+    const key = String(field);
+    if (errors[key]) {
+      setErrors(prev => ({ ...prev, [key]: '' }));
     }
-  };
+  }
 
   const handleSalaryChange = (field: 'min' | 'max', value: string) => {
     const numValue = parseFloat(value) || 0;
@@ -168,31 +170,16 @@ export function CreateJobPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     setIsLoading(true);
-
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      console.log('Creating job:', formData);
-
-      toast({
-        title: 'Job posted successfully',
-        description: `${formData.title} has been created and is now live`,
-      });
-
+      const res = await api.jobs.create(formData);
+      if (!res.success) throw new Error(res.message || 'Failed to create job');
+      toast({ title: 'Job posted successfully', description: `${formData.title} created` });
       navigate('/jobs');
-    } catch (error) {
-      toast({
-        title: 'Error creating job',
-        description: 'Please try again later',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error creating job', description: msg || 'Please try again later', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -200,23 +187,15 @@ export function CreateJobPage() {
 
   const handleSaveAsDraft = async () => {
     setIsLoading(true);
-
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      toast({
-        title: 'Job saved as draft',
-        description: 'You can continue editing later',
-      });
-
+      const draftData = { ...formData, status: 'draft' };
+      const res = await api.jobs.create(draftData);
+      if (!res.success) throw new Error(res.message || 'Failed to save draft');
+      toast({ title: 'Job saved as draft', description: `${formData.title} saved` });
       navigate('/jobs');
-    } catch (error) {
-      toast({
-        title: 'Error saving draft',
-        description: 'Please try again later',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error saving draft', description: msg || 'Please try again later', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }

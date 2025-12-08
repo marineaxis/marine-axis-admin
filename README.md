@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-The app will be available at `http://localhost:8080`
+The app will be available at `http://localhost:8082` (port updated; ensure backend CORS FRONTEND_ORIGIN_ADMIN matches).
 
 ## 🎨 Features
 
@@ -28,23 +28,20 @@ The app will be available at `http://localhost:8080`
 - Recent activity tracking
 - Data export capabilities
 
-### 🏢 Provider Management
-- Full CRUD operations for marine service providers
-- Approval workflow for provider registrations
-- Featured provider management
-- Email notifications (Resend integration ready)
+### 🏢 Provider Management (Planned UI integration)
+- Backend supports approval gating & plan limits
 
-### 💼 Job Management
-- Job posting creation and management
-- Status tracking (draft, published, closed)
-- Category-based organization
-- Location and salary range filtering
+### 💼 Job Management (Implemented)
+- Full CRUD (create, edit, delete) via backend
+- Status actions: publish, unpublish, close
+- Draft creation supported (description or JD file upload)
 
-### 📝 Content Management
-- Blog post creation with rich content
-- SEO metadata management
-- Draft/publish workflow
-- Image upload support
+### 📝 Blog Management (Implemented)
+- Create, edit, publish, archive, delete
+- Conditional editing UI based on permissions
+
+### ⚙️ Plan & Limits
+- Starter plan: max 3 active published jobs (enforced backend)
 
 ### ⚙️ Admin Features
 - Admin user management (Super Admin only)
@@ -86,20 +83,16 @@ Create a `.env.local` file:
 
 ```env
 VITE_API_BASE_URL=http://localhost:3001/api
-VITE_JWT_SECRET=your-jwt-secret-key
 ```
+
+(Remove any unused legacy variables like VITE_JWT_SECRET if not required by current code.)
 
 ### API Integration
 
-The app expects a REST API with the following endpoints:
-
-- `POST /auth/login` - User authentication
-- `GET /analytics/dashboard` - Dashboard metrics
-- `GET /providers` - Provider listings
-- `GET /jobs` - Job listings
-- `GET /approvals` - Pending approvals
-
-See `src/lib/api.ts` for complete API structure.
+The app expects a REST API with endpoints including (see `src/lib/api.ts`):
+- `POST /auth/login`
+- `GET /jobs` / job action endpoints
+- `GET /blogs` / blog action endpoints
 
 ## 🎨 Design System
 
@@ -171,35 +164,41 @@ npm run lint
    ```
 
 2. **Set up Environment**
-   - Copy `.env.example` to `.env.local`
-   - Configure API endpoint
-   - Set JWT secret
+   - Copy `.env.example` (if present) to `.env.local`
+   - Set `VITE_API_BASE_URL`
 
 3. **Start Development**
    ```bash
    npm run dev
    ```
 
-4. **Default Login** (when connected to backend)
-   - Email: `admin@marine-axis.com`
-   - Password: `password123`
+4. **Create Superadmin (No default credentials are seeded)**
+   - Generate bcrypt hash:
+     ```bash
+     node -e "console.log(require('bcryptjs').hashSync('ReplaceWithSecurePwd', 10))"
+     ```
+   - In MongoDB `users` collection insert (adjust fields as backend schema requires):
+     ```js
+     db.users.insertOne({
+       email: 'superadmin@marine-axis.com',
+       password: '<bcrypt-hash>',
+       role: 'superadmin',
+       approved: true,
+       createdAt: new Date(),
+       updatedAt: new Date()
+     })
+     ```
+   - Login with the created email/password.
 
 ## 🔮 Roadmap
 
-- [ ] Advanced analytics with charts
-- [ ] Real-time notifications via WebSocket
-- [ ] File upload with drag-and-drop
-- [ ] Advanced filtering and search
-- [ ] Email template visual editor
-- [ ] Multi-language support
-- [ ] Advanced audit logging
-- [ ] API rate limiting
-- [ ] Two-factor authentication
+- Provider CRUD UI
+- Confirmation dialogs for destructive actions
+- Advanced analytics & notifications
 
 ## 📄 License
 
-This project is proprietary software for Marine-Axis.
+Proprietary software for Marine-Axis.
 
 ---
-
 Built with ❤️ for the marine industry

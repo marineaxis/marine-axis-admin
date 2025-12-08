@@ -12,8 +12,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => Promise<boolean>;
-  hasRole: (role: 'superadmin' | 'admin') => boolean;
-  canAccess: (roles: ('superadmin' | 'admin')[]) => boolean;
+  hasRole: (role: Role) => boolean;
+  canAccess: (roles: Role[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           AuthManager.clearTokens();
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Auth initialization error:', error);
       AuthManager.clearTokens();
     } finally {
@@ -84,10 +84,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
         return false;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Network error. Please check your connection.';
       toast({
         title: 'Login error',
-        description: error.message || 'Network error. Please check your connection.',
+        description: msg,
         variant: 'destructive',
       });
       return false;
@@ -131,21 +132,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
         return false;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'An error occurred while updating profile';
       toast({
         title: 'Update error',
-        description: error.message || 'An error occurred while updating profile',
+        description: msg,
         variant: 'destructive',
       });
       return false;
     }
   };
 
-  const hasRole = (role: 'superadmin' | 'admin'): boolean => {
+  const hasRole = (role: Role): boolean => {
     return AuthManager.hasRole(role);
   };
 
-  const canAccess = (roles: ('superadmin' | 'admin')[]): boolean => {
+  const canAccess = (roles: Role[]): boolean => {
     return AuthManager.canAccess(roles);
   };
 
@@ -170,7 +172,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    console.error('[AuthContext] useAuth called outside provider. Returning safe fallback.');
+    return {
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      login: async () => false,
+      logout: () => { window.location.href = '/login'; },
+      updateProfile: async () => false,
+      hasRole: (_role: Role) => false,
+      canAccess: (_roles: Role[]) => false,
+    };
   }
   return context;
 };

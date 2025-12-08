@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 
-import { User } from '../types';
+import { User, TableFilters, Role, PaginatedResponse, ApiResponse } from '../types';
 import { useAuth } from '../context/AuthContext';
 import useCRUD from '../hooks/useCRUD';
 import api from '../lib/api';
@@ -26,12 +26,21 @@ export function AdminsPage() {
   const { user, hasRole } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', email: '', role: 'admin', isActive: true });
+  const [editForm, setEditForm] = useState<{ name: string; email: string; role: Role; isActive: boolean }>({ name: '', email: '', role: 'admin', isActive: true });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+
+  // Cast the admins API to the CRUD subset expected by useCRUD
+  const adminsApi = api.admins as unknown as {
+    list: (params?: TableFilters) => Promise<PaginatedResponse<User>>;
+    get: (id: string) => Promise<ApiResponse<User>>;
+    create?: (data?: unknown) => Promise<ApiResponse<User>>;
+    update?: (id: string, data?: unknown) => Promise<ApiResponse<User>>;
+    delete?: (id: string) => Promise<ApiResponse<void>>;
+  };
 
   // Use CRUD hook for admin management
   const {
@@ -45,7 +54,7 @@ export function AdminsPage() {
     setFilters,
   } = useCRUD<User>({
     resource: 'admins',
-    api: api.admins,
+    api: adminsApi,
     messages: {
       updated: 'Admin updated successfully',
       deleted: 'Admin deleted successfully',
@@ -54,7 +63,7 @@ export function AdminsPage() {
 
   // Apply filters when search or filter values change
   useEffect(() => {
-    const filters: any = {};
+    const filters: Partial<TableFilters> = {};
     
     if (searchQuery.trim()) {
       filters.search = searchQuery.trim();
@@ -164,6 +173,7 @@ export function AdminsPage() {
       <Badge variant="secondary">Inactive</Badge>
     );
   };
+
   // Only super admins can access this page
   if (!hasRole('superadmin')) {
     return (
@@ -230,7 +240,7 @@ export function AdminsPage() {
                 className="pl-9"
               />
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as Role | 'all')}>
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -380,7 +390,10 @@ export function AdminsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
-              <Select value={editForm.role} onValueChange={(value) => setEditForm(prev => ({ ...prev, role: value }))}>
+              <Select value={editForm.role} onValueChange={(value) => {
+                const v = value as Role;
+                setEditForm(prev => ({ ...prev, role: v }));
+              }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -395,7 +408,7 @@ export function AdminsPage() {
               <Switch
                 id="edit-active"
                 checked={editForm.isActive}
-                onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, isActive: checked }))}
+                onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, isActive: Boolean(checked) }))}
               />
               <Label htmlFor="edit-active">Active</Label>
             </div>
