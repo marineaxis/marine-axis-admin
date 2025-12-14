@@ -369,7 +369,10 @@ export function ProvidersPage() {
                           <div className="text-sm text-muted-foreground">{provider.phone}</div>
                         </div>
                       </TableCell>
-                      <TableCell>{provider.location}</TableCell>
+                      <TableCell>{typeof provider.location === 'object' && provider.location && Array.isArray(provider.location.coordinates)
+  ? `${provider.location.coordinates[1]}, ${provider.location.coordinates[0]}`
+  : (typeof provider.location === 'string' ? provider.location : '')}
+</TableCell>
                       <TableCell>{getStatusBadge(provider.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -477,7 +480,11 @@ export function ProvidersPage() {
                     <div><span className="font-medium">Name:</span> {selectedProvider.name}</div>
                     <div><span className="font-medium">Email:</span> {selectedProvider.email}</div>
                     <div><span className="font-medium">Phone:</span> {selectedProvider.phone}</div>
-                    <div><span className="font-medium">Location:</span> {selectedProvider.location}</div>
+                    <div><span className="font-medium">Location:</span> {
+                      typeof selectedProvider.location === 'object' && selectedProvider.location && Array.isArray(selectedProvider.location.coordinates)
+                        ? `${selectedProvider.location.coordinates[1]}, ${selectedProvider.location.coordinates[0]}`
+                        : (typeof selectedProvider.location === 'string' ? selectedProvider.location : 'Not provided')
+                    }</div>
                     <div><span className="font-medium">Website:</span> {selectedProvider.website || 'Not provided'}</div>
                   </div>
                 </div>

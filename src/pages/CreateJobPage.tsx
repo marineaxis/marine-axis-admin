@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Plus, X, Calendar, DollarSign, MapPin, Clock } from 'lucide-react';
 
@@ -15,20 +15,13 @@ import { useToast } from '@/hooks/use-toast';
 import { CreateJobForm } from '../types';
 import api from '../lib/api';
 
-// Mock categories for selection
+// Mock categories for selection (using valid MongoDB ObjectId format)
 const MOCK_CATEGORIES = [
-  { id: '1', name: 'Marine Equipment' },
-  { id: '2', name: 'Boat Maintenance' },
-  { id: '3', name: 'Electronics & Navigation' },
-  { id: '4', name: 'Repair Services' },
-  { id: '5', name: 'Marina Services' },
-];
-
-// Mock providers for selection
-const MOCK_PROVIDERS = [
-  { id: '1', name: 'Marine Solutions Ltd' },
-  { id: '2', name: 'Ocean Tech Services' },
-  { id: '3', name: 'Coastal Marine Works' },
+  { id: '507f1f77bcf86cd799439011', name: 'Marine Equipment' },
+  { id: '507f1f77bcf86cd799439012', name: 'Boat Maintenance' },
+  { id: '507f1f77bcf86cd799439013', name: 'Electronics & Navigation' },
+  { id: '507f1f77bcf86cd799439014', name: 'Repair Services' },
+  { id: '507f1f77bcf86cd799439015', name: 'Marina Services' },
 ];
 
 export function CreateJobPage() {
@@ -36,6 +29,7 @@ export function CreateJobPage() {
   const { toast } = useToast();
   
   const [isLoading, setIsLoading] = useState(false);
+  const [providers, setProviders] = useState<Array<{ id: string; name: string }>>([]);
   const [formData, setFormData] = useState<CreateJobForm>({
     title: '',
     description: '',
@@ -58,6 +52,25 @@ export function CreateJobPage() {
   const [currentRequirement, setCurrentRequirement] = useState('');
   const [currentBenefit, setCurrentBenefit] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch providers on component mount
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        const response = await api.providers.list({ page: 1, limit: 100 });
+        if (response && response.data) {
+          setProviders(response.data.map((p: { id?: string; _id?: string; name?: string; companyName?: string }) => ({ 
+            id: p.id || p._id || '', 
+            name: p.name || p.companyName || 'Unknown Provider' 
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to fetch providers:', error);
+        toast({ title: 'Error', description: 'Failed to load providers', variant: 'destructive' });
+      }
+    };
+    fetchProviders();
+  }, [toast]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -173,7 +186,38 @@ export function CreateJobPage() {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      const res = await api.jobs.create(formData);
+      // Map frontend form data to backend API schema
+      const jobData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.categoryIds[0] || '', // Backend expects single category
+        providerId: formData.providerId, // For admin to specify provider
+        address: {
+          street: '',
+          city: formData.location.split(',')[0]?.trim() || '',
+          state: formData.location.split(',')[1]?.trim() || '',
+          country: formData.location.split(',')[2]?.trim() || 'USA',
+        },
+        location: {
+          coordinates: [0, 0], // Default coordinates, should be geocoded in real app
+        },
+        jobType: formData.type,
+        experience: formData.urgency === 'high' ? 'senior' : formData.urgency === 'medium' ? 'mid' : 'entry',
+        salary: {
+          min: formData.salaryRange.min,
+          max: formData.salaryRange.max,
+          currency: formData.salaryRange.currency || 'USD',
+          period: 'annually',
+        },
+        contactEmail: 'jobs@marine-axis.com', // Default, should come from provider
+        contactPhone: '',
+        requirements: formData.requirements,
+        responsibilities: [], // Add if form has this field
+        benefits: formData.benefits,
+        tags: [],
+      };
+      
+      const res = await api.jobs.create(jobData);
       if (!res.success) throw new Error(res.message || 'Failed to create job');
       toast({ title: 'Job posted successfully', description: `${formData.title} created` });
       navigate('/jobs');
@@ -250,7 +294,7 @@ export function CreateJobPage() {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_PROVIDERS.map((provider) => (
+                    {providers.map((provider) => (
                       <SelectItem key={provider.id} value={provider.id}>
                         {provider.name}
                       </SelectItem>
