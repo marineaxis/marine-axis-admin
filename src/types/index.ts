@@ -45,7 +45,13 @@ export interface Job {
   providerId: string;
   provider?: Provider;
   categoryIds: string[];
-  location: string;
+  location: string | { type: 'Point'; coordinates: [number, number] };
+  address?: {
+    street?: string;
+    city: string;
+    state: string;
+    country: string;
+  };
   salaryRange: {
     min: number;
     max: number;
@@ -275,6 +281,12 @@ export interface CreateProviderForm {
     facebook?: string;
     twitter?: string;
   };
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  latitude?: string;
+  longitude?: string;
 }
 
 export interface CreateJobForm {

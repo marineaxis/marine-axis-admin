@@ -249,7 +249,15 @@ export function useCRUD<T extends { id: string }>(
       }
       return null;
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : `Failed to create ${resource}`;
+      let message = error instanceof Error ? error.message : `Failed to create ${resource}`;
+      
+      // Handle MongoDB duplicate key error for email
+      if (message.includes('E11000') && message.includes('email')) {
+        message = 'This email address is already registered. Please use a different email.';
+      } else if (message.includes('E11000')) {
+        message = 'This record already exists. Please check your input and try again.';
+      }
+      
       toast({
         title: 'Create Error',
         description: message,

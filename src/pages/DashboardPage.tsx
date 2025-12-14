@@ -157,7 +157,8 @@ export function DashboardPage() {
       customers?: { total?: number };
       admins?: { total?: number };
       pendingProviders?: unknown[];
-      // ...add more fields as needed
+      jobs?: { total?: number; published?: number };
+      blogs?: { total?: number; published?: number };
     }
     const run = async () => {
       setLoading(true);
@@ -170,6 +171,10 @@ export function DashboardPage() {
             totalProviders: dashData.providers?.total ?? prev.totalProviders,
             totalUsers: (dashData.customers?.total ?? 0) + (dashData.providers?.total ?? 0) + (dashData.admins?.total ?? 0),
             pendingApprovals: Array.isArray(dashData.pendingProviders) ? dashData.pendingProviders.length : prev.pendingApprovals,
+            totalJobs: dashData.jobs?.published ?? prev.totalJobs,
+            totalBlogs: dashData.blogs?.published ?? prev.totalBlogs,
+            activeJobs: dashData.jobs?.published ?? prev.activeJobs,
+            publishedBlogs: dashData.blogs?.published ?? prev.publishedBlogs,
           }));
           if (Array.isArray(dashData.pendingProviders)) {
             const normalized = (dashData.pendingProviders as unknown[]).map(asProvider) as Provider[];

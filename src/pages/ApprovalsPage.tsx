@@ -131,34 +131,16 @@ export function ApprovalsPage() {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Failed to fetch approval data:', msg);
       toast({
-        title: 'Error',
-        description: 'Failed to load approval data. Using offline mode.',
+        title: 'Error loading approvals',
+        description: `Unable to fetch approval data from the server. ${msg}`,
         variant: 'destructive',
       });
       
-      // Fallback to mock data if API fails
-      const mockApprovals: ApprovalRequest[] = [
-        {
-          id: '1',
-          type: 'provider',
-          title: 'Pacific Marine Solutions',
-          description: 'New provider registration for marine equipment and services',
-          submitter: { name: 'John Smith', email: 'john@pacificmarine.com' },
-          status: 'pending',
-          priority: 'high',
-          submittedAt: '2024-01-25T10:30:00Z',
-          details: {
-            companyName: 'Pacific Marine Solutions',
-            location: 'Seattle, WA',
-            services: ['Equipment Supply', 'Maintenance', 'Repair'],
-            website: 'https://pacificmarine.com',
-            employees: '25-50',
-            experience: '15 years'
-          }
-        }
-      ];
-      setPendingApprovals(mockApprovals);
-      setApprovalStats({ pending: 1, approved: 0, rejected: 0, total: 1 });
+      // Set empty state instead of using mock data
+      setPendingApprovals([]);
+      setApprovedApprovals([]);
+      setRejectedApprovals([]);
+      setApprovalStats({ pending: 0, approved: 0, rejected: 0, total: 0 });
     }
   }, [toast]);
 

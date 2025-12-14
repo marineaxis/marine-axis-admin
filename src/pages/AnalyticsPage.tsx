@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Users, Briefcase, Building2, TrendingUp, TrendingDown, Eye, MousePointer, Clock, DollarSign, MapPin, Star } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import api from '../lib/api';
 
-// Mock analytics data
-const ANALYTICS_DATA = {
+// Default analytics data structure
+const DEFAULT_ANALYTICS_DATA = {
   overview: {
     totalProviders: 247,
     totalJobs: 89,
@@ -69,7 +71,110 @@ const ANALYTICS_DATA = {
 };
 
 export function AnalyticsPage() {
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState('30');
+  const [analyticsData, setAnalyticsData] = useState(DEFAULT_ANALYTICS_DATA);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange]);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch dashboard analytics
+      const dashboardResponse = await api.analytics.adminDashboard();
+      
+      if (dashboardResponse.success && dashboardResponse.data) {
+        const data = dashboardResponse.data as {
+          providers?: { total?: number };
+          customers?: { total?: number };
+          admins?: { total?: number };
+        };
+        
+        // Map dashboard data to overview structure
+        const totalUsers = (data.providers?.total ?? 0) + (data.customers?.total ?? 0) + (data.admins?.total ?? 0);
+        
+        setAnalyticsData(prev => ({
+          ...prev,
+          overview: {
+            ...prev.overview,
+            totalProviders: data.providers?.total ?? prev.overview.totalProviders,
+            totalUsers: totalUsers > 0 ? totalUsers : prev.overview.totalUsers,
+          },
+        }));
+      }
+
+      // Fetch provider analytics
+      const providersResponse = await api.analytics.providers({ dateRange });
+      if (providersResponse.success && providersResponse.data) {
+        const data = providersResponse.data as {
+          pendingApprovals?: number;
+          featuredProviders?: number;
+          averageRating?: number;
+          topPerformers?: Array<{ name: string; rating: number; jobs: number; applications: number }>;
+          total?: number;
+        };
+        
+        setAnalyticsData(prev => ({
+          ...prev,
+          providerMetrics: {
+            ...prev.providerMetrics,
+            pendingApprovals: data.pendingApprovals ?? prev.providerMetrics.pendingApprovals,
+            featuredProviders: data.featuredProviders ?? prev.providerMetrics.featuredProviders,
+            averageRating: data.averageRating ?? prev.providerMetrics.averageRating,
+            topPerformers: data.topPerformers ?? prev.providerMetrics.topPerformers,
+          },
+          overview: {
+            ...prev.overview,
+            totalProviders: data.total ?? prev.overview.totalProviders,
+          },
+        }));
+      }
+
+      // Fetch job analytics
+      const jobsResponse = await api.analytics.jobs({ dateRange });
+      if (jobsResponse.success && jobsResponse.data) {
+        const data = jobsResponse.data as {
+          activeJobs?: number;
+          expiringSoon?: number;
+          averageApplications?: number;
+          averageSalary?: number;
+          topCategories?: Array<{ name: string; jobs: number; applications: number }>;
+          total?: number;
+        };
+        
+        setAnalyticsData(prev => ({
+          ...prev,
+          jobMetrics: {
+            ...prev.jobMetrics,
+            activeJobs: data.activeJobs ?? prev.jobMetrics.activeJobs,
+            expiringSoon: data.expiringSoon ?? prev.jobMetrics.expiringSoon,
+            averageApplications: data.averageApplications ?? prev.jobMetrics.averageApplications,
+            averageSalary: data.averageSalary ?? prev.jobMetrics.averageSalary,
+            topCategories: data.topCategories ?? prev.jobMetrics.topCategories,
+          },
+          overview: {
+            ...prev.overview,
+            totalJobs: data.total ?? prev.overview.totalJobs,
+          },
+        }));
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch analytics:', error);
+      toast({
+        title: 'Error loading analytics',
+        description: 'Unable to fetch analytics data. Showing default values.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
@@ -127,10 +232,10 @@ export function AnalyticsPage() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalProviders)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.providersGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.providersGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.providersGrowth)}% from last month
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalProviders)}</div>
+            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.providersGrowth)}`}>
+              {React.createElement(getGrowthIcon(analyticsData.overview.providersGrowth), { className: "h-3 w-3" })}
+              {Math.abs(analyticsData.overview.providersGrowth)}% from last month
             </div>
           </CardContent>
         </Card>
@@ -141,10 +246,10 @@ export function AnalyticsPage() {
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalJobs)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.jobsGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.jobsGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.jobsGrowth)}% from last month
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalJobs)}</div>
+            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.jobsGrowth)}`}>
+              {React.createElement(getGrowthIcon(analyticsData.overview.jobsGrowth), { className: "h-3 w-3" })}
+              {Math.abs(analyticsData.overview.jobsGrowth)}% from last month
             </div>
           </CardContent>
         </Card>
@@ -155,10 +260,10 @@ export function AnalyticsPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalApplications)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.applicationsGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.applicationsGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.applicationsGrowth)}% from last month
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalApplications)}</div>
+            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.applicationsGrowth)}`}>
+              {React.createElement(getGrowthIcon(analyticsData.overview.applicationsGrowth), { className: "h-3 w-3" })}
+              {Math.abs(analyticsData.overview.applicationsGrowth)}% from last month
             </div>
           </CardContent>
         </Card>
@@ -169,10 +274,10 @@ export function AnalyticsPage() {
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalUsers)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.usersGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.usersGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.usersGrowth)}% from last month
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalUsers)}</div>
+            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.usersGrowth)}`}>
+              {React.createElement(getGrowthIcon(analyticsData.overview.usersGrowth), { className: "h-3 w-3" })}
+              {Math.abs(analyticsData.overview.usersGrowth)}% from last month
             </div>
           </CardContent>
         </Card>
@@ -194,7 +299,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{ANALYTICS_DATA.jobMetrics.activeJobs}</div>
+                <div className="text-2xl font-bold text-green-600">{analyticsData.jobMetrics.activeJobs}</div>
                 <p className="text-xs text-muted-foreground">Currently accepting applications</p>
               </CardContent>
             </Card>
@@ -204,7 +309,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{ANALYTICS_DATA.jobMetrics.expiringSoon}</div>
+                <div className="text-2xl font-bold text-orange-600">{analyticsData.jobMetrics.expiringSoon}</div>
                 <p className="text-xs text-muted-foreground">Expiring within 7 days</p>
               </CardContent>
             </Card>
@@ -214,7 +319,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Avg Applications</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{ANALYTICS_DATA.jobMetrics.averageApplications}</div>
+                <div className="text-2xl font-bold">{analyticsData.jobMetrics.averageApplications}</div>
                 <p className="text-xs text-muted-foreground">Per job posting</p>
               </CardContent>
             </Card>
@@ -224,7 +329,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Average Salary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(ANALYTICS_DATA.jobMetrics.averageSalary)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(analyticsData.jobMetrics.averageSalary)}</div>
                 <p className="text-xs text-muted-foreground">Across all positions</p>
               </CardContent>
             </Card>
@@ -237,7 +342,7 @@ export function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {ANALYTICS_DATA.jobMetrics.topCategories.map((category, index) => (
+                {analyticsData.jobMetrics.topCategories.map((category, index) => (
                   <div key={category.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-medium">#{index + 1}</div>
@@ -264,7 +369,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{ANALYTICS_DATA.providerMetrics.pendingApprovals}</div>
+                <div className="text-2xl font-bold text-orange-600">{analyticsData.providerMetrics.pendingApprovals}</div>
                 <p className="text-xs text-muted-foreground">Awaiting review</p>
               </CardContent>
             </Card>
@@ -274,7 +379,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Featured Providers</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{ANALYTICS_DATA.providerMetrics.featuredProviders}</div>
+                <div className="text-2xl font-bold text-blue-600">{analyticsData.providerMetrics.featuredProviders}</div>
                 <p className="text-xs text-muted-foreground">Currently featured</p>
               </CardContent>
             </Card>
@@ -286,7 +391,7 @@ export function AnalyticsPage() {
               <CardContent>
                 <div className="text-2xl font-bold flex items-center gap-1">
                   <Star className="h-5 w-5 text-yellow-500 fill-current" />
-                  {ANALYTICS_DATA.providerMetrics.averageRating}
+                  {analyticsData.providerMetrics.averageRating}
                 </div>
                 <p className="text-xs text-muted-foreground">Platform average</p>
               </CardContent>
@@ -300,7 +405,7 @@ export function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {ANALYTICS_DATA.providerMetrics.topPerformers.map((provider, index) => (
+                {analyticsData.providerMetrics.topPerformers.map((provider, index) => (
                   <div key={provider.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-medium">#{index + 1}</div>
@@ -330,7 +435,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Page Views</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.engagement.pageViews)}</div>
+                <div className="text-2xl font-bold">{formatNumber(analyticsData.engagement.pageViews)}</div>
                 <p className="text-xs text-muted-foreground">Total views this month</p>
               </CardContent>
             </Card>
@@ -340,7 +445,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Unique Visitors</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.engagement.uniqueVisitors)}</div>
+                <div className="text-2xl font-bold">{formatNumber(analyticsData.engagement.uniqueVisitors)}</div>
                 <p className="text-xs text-muted-foreground">Individual users</p>
               </CardContent>
             </Card>
@@ -350,7 +455,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Session Time</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{ANALYTICS_DATA.engagement.averageSessionTime}</div>
+                <div className="text-2xl font-bold">{analyticsData.engagement.averageSessionTime}</div>
                 <p className="text-xs text-muted-foreground">Average duration</p>
               </CardContent>
             </Card>
@@ -360,7 +465,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Bounce Rate</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{ANALYTICS_DATA.engagement.bounceRate}%</div>
+                <div className="text-2xl font-bold">{analyticsData.engagement.bounceRate}%</div>
                 <p className="text-xs text-muted-foreground">Single page visits</p>
               </CardContent>
             </Card>
@@ -373,7 +478,7 @@ export function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {ANALYTICS_DATA.engagement.topPages.map((page, index) => (
+                {analyticsData.engagement.topPages.map((page, index) => (
                   <div key={page.page} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-medium">#{index + 1}</div>
@@ -401,7 +506,7 @@ export function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {ANALYTICS_DATA.regionData.map((region) => (
+                {analyticsData.regionData.map((region) => (
                   <div key={region.region} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">

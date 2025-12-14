@@ -250,9 +250,9 @@ class ApiClient {
     getFeatured: async (params?: Record<string, unknown>) => this.get('/providers/featured', params),
     getPending: async (params?: Record<string, unknown>) => this.get('/providers/pending', params),
     getStats: async () => this.get('/providers/stats'),
-    approve: async (id: string) => this.patch(`/providers/${id}/approve`),
-    reject: async (id: string, reason: string) => this.patch(`/providers/${id}/reject`, { rejectionReason: reason }),
-    reapply: async (id: string, data: Record<string, unknown>) => this.patch(`/providers/${id}/reapply`, data),
+    approve: async (id: string) => this.post(`/providers/${id}/approve`),
+    reject: async (id: string, reason: string) => this.post(`/providers/${id}/reject`, { rejectionReason: reason }),
+    reapply: async (id: string, data: Record<string, unknown>) => this.post(`/providers/${id}/reapply`, data),
     toggleFeatured: async (id: string) => this.patch(`/providers/${id}/featured`),
     sendWelcomeEmail: async (id: string) => this.post(`/providers/${id}/welcome-email`),
   };

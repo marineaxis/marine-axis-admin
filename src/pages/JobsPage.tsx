@@ -209,6 +209,15 @@ export function JobsPage() {
     return daysUntilExpiry <= 7;
   };
 
+  const formatLocation = (location: string | { type: 'Point'; coordinates: [number, number] }, address?: { street?: string; city: string; state: string; country: string }) => {
+    if (typeof location === 'string') return location;
+    if (address) return `${address.city}, ${address.state}, ${address.country}`;
+    if (location && typeof location === 'object' && 'coordinates' in location) {
+      return `${location.coordinates[1]}, ${location.coordinates[0]}`;
+    }
+    return 'Not specified';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -301,7 +310,7 @@ export function JobsPage() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <MapPin className="h-3 w-3 text-muted-foreground" />
-                          {job.location}
+                          {formatLocation(job.location, job.address)}
                         </div>
                       </TableCell>
                       <TableCell>{formatSalary(job.salaryRange, job.type)}</TableCell>
@@ -414,7 +423,10 @@ export function JobsPage() {
                   <div className="space-y-2 text-sm">
                     <div><span className="font-medium">Title:</span> {selectedJob.title}</div>
                     <div><span className="font-medium">Type:</span> {selectedJob.type}</div>
-                    <div><span className="font-medium">Location:</span> {selectedJob.location}</div>
+                    <div>
+                      <span className="font-medium">Location:</span>{' '}
+                      {formatLocation(selectedJob.location, selectedJob.address)}
+                    </div>
                     <div><span className="font-medium">Remote:</span> {selectedJob.remote ? 'Yes' : 'No'}</div>
                     <div><span className="font-medium">Salary:</span> {formatSalary(selectedJob.salaryRange, selectedJob.type)}</div>
                     <div><span className="font-medium">Urgency:</span> {getUrgencyBadge(selectedJob.urgency)}</div>

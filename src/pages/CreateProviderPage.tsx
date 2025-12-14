@@ -18,11 +18,11 @@ import api from '../lib/api';
 
 // Mock categories for selection
 const MOCK_CATEGORIES = [
-  { id: '1', name: 'Marine Equipment' },
-  { id: '2', name: 'Boat Maintenance' },
-  { id: '3', name: 'Electronics & Navigation' },
-  { id: '4', name: 'Repair Services' },
-  { id: '5', name: 'Marina Services' },
+  { id: '655f0c2e8b8e2a001e3e3a01', name: 'Marine Equipment' },
+  { id: '655f0c2e8b8e2a001e3e3a02', name: 'Boat Maintenance' },
+  { id: '655f0c2e8b8e2a001e3e3a03', name: 'Electronics & Navigation' },
+  { id: '655f0c2e8b8e2a001e3e3a04', name: 'Repair Services' },
+  { id: '655f0c2e8b8e2a001e3e3a05', name: 'Marina Services' },
 ];
 
 export function CreateProviderPage() {
@@ -43,6 +43,10 @@ export function CreateProviderPage() {
       facebook: '',
       twitter: '',
     },
+    street: '',
+    city: '',
+    state: '',
+    country: '',
   });
 
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
@@ -51,9 +55,9 @@ export function CreateProviderPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Use CRUD hook for provider creation
-  const { createItem, creating } = useCRUD<any>({
+  const { createItem, creating } = useCRUD<{ id: string }>({
     resource: 'providers',
-    api: api.providers,
+    api: api.providers as never,
     messages: {
       created: 'Provider created successfully and is pending approval',
     },
@@ -67,7 +71,10 @@ export function CreateProviderPage() {
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid email format';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    if (!formData.location.trim()) newErrors.location = 'Location is required';
+    if (!formData.street.trim()) newErrors.street = 'Street is required';
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.state.trim()) newErrors.state = 'State is required';
+    if (!formData.country.trim()) newErrors.country = 'Country is required';
     if (!formData.description.trim()) newErrors.description = 'Description is required';
     if (formData.categoryIds.length === 0) newErrors.categoryIds = 'At least one category is required';
     if (formData.services.length === 0) newErrors.services = 'At least one service is required';
@@ -139,18 +146,21 @@ export function CreateProviderPage() {
     }
   };
 
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            setUploadedPhotos(prev => [...prev, e.target!.result as string]);
+      const uploadedUrls: string[] = [];
+      for (const file of Array.from(files)) {
+        try {
+          const res = await api.uploadFile(file, 'providers');
+          if (res.success && res.data?.url) {
+            uploadedUrls.push(res.data.url);
           }
-        };
-        reader.readAsDataURL(file);
-      });
+        } catch (e) {
+          toast({ title: 'Photo upload failed', description: (e as Error).message, variant: 'destructive' });
+        }
+      }
+      setUploadedPhotos(prev => [...prev, ...uploadedUrls]);
     }
   };
 
@@ -166,30 +176,32 @@ export function CreateProviderPage() {
     }
 
     // Sanitize data
-    const sanitizedData = {
+    const sanitizedData: Record<string, unknown> = {
       companyName: formData.name.trim(),
       contactName: formData.name.trim(), // Using same name for contact
       email: sanitize.email(formData.email),
       phone: sanitize.phone(formData.phone),
       description: formData.description.trim(),
       address: {
-        street: '',
-        city: formData.location.split(',')[0]?.trim() || '',
-        state: formData.location.split(',')[1]?.trim() || '',
-        country: 'USA',
+        street: formData.street.trim(),
+        city: formData.city.trim(),
+        state: formData.state.trim(),
+        country: formData.country.trim(),
         zipCode: ''
-      },
-      location: {
-        coordinates: [0, 0] // Default coordinates
       },
       website: formData.website ? sanitize.url(formData.website) : undefined,
       services: formData.services,
       categoryIds: formData.categoryIds,
-      socialLinks: formData.socialLinks,
+      // Map socialLinks to socialMedia array for backend
+      socialMedia: Object.entries(formData.socialLinks || {}).filter(([key, url]) => url).map(([key, url]) => ({ key, url })),
+      // Only include gallery if there are uploaded photos
+      ...(uploadedPhotos.length > 0 ? { gallery: uploadedPhotos } : {}),
     };
 
     const result = await createItem(sanitizedData);
     
+    // useCRUD already handles success/error toasts
+    // Just navigate on success (result will be the provider data or null)
     if (result) {
       navigate('/providers');
     }
@@ -272,6 +284,54 @@ export function CreateProviderPage() {
                   className={errors.location ? 'border-destructive' : ''}
                 />
                 {errors.location && <p className="text-sm text-destructive">{errors.location}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="street">Street *</Label>
+                <Input
+                  id="street"
+                  placeholder="Enter street"
+                  value={formData.street}
+                  onChange={(e) => handleInputChange('street', e.target.value)}
+                  className={errors.street ? 'border-destructive' : ''}
+                />
+                {errors.street && <p className="text-sm text-destructive">{errors.street}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="city">City *</Label>
+                <Input
+                  id="city"
+                  placeholder="Enter city"
+                  value={formData.city}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
+                  className={errors.city ? 'border-destructive' : ''}
+                />
+                {errors.city && <p className="text-sm text-destructive">{errors.city}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="state">State *</Label>
+                <Input
+                  id="state"
+                  placeholder="Enter state"
+                  value={formData.state}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
+                  className={errors.state ? 'border-destructive' : ''}
+                />
+                {errors.state && <p className="text-sm text-destructive">{errors.state}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country">Country *</Label>
+                <Input
+                  id="country"
+                  placeholder="Enter country"
+                  value={formData.country}
+                  onChange={(e) => handleInputChange('country', e.target.value)}
+                  className={errors.country ? 'border-destructive' : ''}
+                />
+                {errors.country && <p className="text-sm text-destructive">{errors.country}</p>}
               </div>
             </div>
 
