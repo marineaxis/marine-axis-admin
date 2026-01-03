@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, FolderTree, ToggleLeft, ToggleRight } from 'lucide-react';
+import { 
+  Plus, Search, MoreHorizontal, Edit, Trash2, Eye, FolderTree, ToggleLeft, ToggleRight,
+  Anchor, Wrench, Radio, Settings, Ship, Compass, Waves, Cog, Hammer, BarChart3
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +23,22 @@ import useCRUD from '../hooks/useCRUD';
 import api from '../lib/api';
 
 const ICON_OPTIONS = [
-  'anchor', 'wrench', 'radar', 'settings', 'ship', 'compass', 'waves', 'gear', 'tool', 'chart'
+  'anchor', 'wrench', 'radio', 'settings', 'ship', 'compass', 'waves', 'cog', 'hammer', 'bar-chart'
 ];
+
+// Icon mapping for dynamic rendering
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  anchor: Anchor,
+  wrench: Wrench,
+  radio: Radio,
+  settings: Settings,
+  ship: Ship,
+  compass: Compass,
+  waves: Waves,
+  cog: Cog,
+  hammer: Hammer,
+  'bar-chart': BarChart3,
+};
 
 export function CategoriesPage() {
   const navigate = useNavigate();
@@ -70,17 +87,41 @@ export function CategoriesPage() {
     fetchItems();
   }, [fetchItems]);
 
+  // Transform backend categories to match frontend type
+  const transformedCategories = categories.map(cat => ({
+    ...cat,
+    // Backend uses isActive, frontend expects active
+    active: (cat as any).isActive !== undefined ? (cat as any).isActive : cat.active !== undefined ? cat.active : true,
+    // Backend uses parentCategory (ObjectId), map to parentId (string) if needed
+    parentId: cat.parentId || ((cat as any).parentCategory ? String((cat as any).parentCategory) : undefined),
+    // Provide defaults for missing fields - use icon from backend if available
+    icon: (cat as any).icon || cat.icon || 'anchor',
+    order: cat.order || 0,
+    providersCount: cat.providersCount || 0,
+    jobsCount: cat.jobsCount || 0,
+    children: cat.children || [],
+  }));
+
   // Filter categories
-  const filteredCategories = categories.filter(category =>
+  const filteredCategories = transformedCategories.filter(category =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    category.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (category.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleToggleActive = async (categoryId: string) => {
-    const categoryToToggle = categories.find(c => c.id === categoryId);
+    const categoryToToggle = transformedCategories.find(c => c.id === categoryId);
     if (!categoryToToggle) return;
 
-    await updateItem(categoryId, { active: !categoryToToggle.active });
+    try {
+      // Backend expects isActive, not active
+      const result = await updateItem(categoryId, { isActive: !categoryToToggle.active });
+      if (result) {
+        // Force refresh to get the updated data from backend
+        await fetchItems();
+      }
+    } catch (error) {
+      console.error('Failed to toggle category active status:', error);
+    }
   };
 
   const handleDelete = async (categoryId: string) => {
@@ -92,7 +133,6 @@ export function CategoriesPage() {
 
     if (!createForm.name.trim()) newErrors.name = 'Category name is required';
     if (!createForm.description.trim()) newErrors.description = 'Description is required';
-    if (!createForm.icon) newErrors.icon = 'Icon is required';
 
     setCreateErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -102,18 +142,17 @@ export function CategoriesPage() {
     if (e) e.preventDefault();
 
     if (validateCreateForm()) {
-      const newCategoryData = {
-        id: String(categories.length + 1),
+      const newCategoryData: any = {
         name: createForm.name.trim(),
         description: createForm.description.trim(),
-        icon: createForm.icon,
-        parentId: createForm.parentId || undefined,
-        children: [],
-        providersCount: 0,
-        jobsCount: 0,
-        order: createForm.order || categories.length + 1,
-        active: true,
+        icon: createForm.icon || 'anchor',
+        isActive: true, // Backend expects isActive
       };
+      
+      // Only include parentId if provided
+      if (createForm.parentId) {
+        newCategoryData.parentId = createForm.parentId;
+      }
       const result = await createItem(newCategoryData);
       if (result) {
         setIsCreateDialogOpen(false);
@@ -133,11 +172,11 @@ export function CategoriesPage() {
     setEditingCategory(category);
     setEditForm({
       name: category.name,
-      description: category.description,
-      icon: category.icon,
+      description: category.description || '',
+      icon: category.icon || 'anchor',
       parentId: category.parentId,
-      order: category.order,
-      active: category.active,
+      order: category.order || 0,
+      active: category.active !== undefined ? category.active : true,
     });
     setEditErrors({});
     setIsEditDialogOpen(true);
@@ -156,14 +195,19 @@ export function CategoriesPage() {
   const handleUpdateCategory = async () => {
     if (!validateEditForm() || !editingCategory) return;
 
-    const updateData = {
+    const updateData: any = {
       name: editForm.name.trim(),
       description: editForm.description.trim(),
-      icon: editForm.icon,
-      parentId: editForm.parentId,
-      order: editForm.order,
-      active: editForm.active,
+      icon: editForm.icon || 'anchor',
+      // Backend expects isActive, not active
+      isActive: editForm.active,
     };
+    
+    // Only include parentId if it's provided (backend uses parentId in update schema)
+    if (editForm.parentId) {
+      updateData.parentId = editForm.parentId;
+    }
+    
     const result = await updateItem(editingCategory.id, updateData);
     if (result) {
       setIsEditDialogOpen(false);
@@ -250,17 +294,23 @@ export function CategoriesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="create-icon">Icon *</Label>
-                <Select value={createForm.icon} onValueChange={(value) => setCreateForm(prev => ({ ...prev, icon: value }))}>
+                <Label htmlFor="create-icon">Icon</Label>
+                <Select value={createForm.icon || 'anchor'} onValueChange={(value) => setCreateForm(prev => ({ ...prev, icon: value }))}>
                   <SelectTrigger className={createErrors.icon ? 'border-destructive' : ''}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ICON_OPTIONS.map((icon) => (
-                      <SelectItem key={icon} value={icon}>
-                        {icon}
-                      </SelectItem>
-                    ))}
+                    {ICON_OPTIONS.map((icon) => {
+                      const IconComponent = iconMap[icon] || Anchor;
+                      return (
+                        <SelectItem key={icon} value={icon}>
+                          <div className="flex items-center gap-2">
+                            <IconComponent className="h-4 w-4" />
+                            <span className="capitalize">{icon}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 {createErrors.icon && <p className="text-sm text-destructive">{createErrors.icon}</p>}
@@ -274,7 +324,7 @@ export function CategoriesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None (Top level)</SelectItem>
-                    {categories.map((category) => (
+                    {transformedCategories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
                       </SelectItem>
@@ -352,7 +402,10 @@ export function CategoriesPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center">
-                            <span className="text-xs font-medium">{category.icon}</span>
+                            {(() => {
+                              const IconComponent = iconMap[category.icon || 'anchor'] || Anchor;
+                              return <IconComponent className="h-4 w-4" />;
+                            })()}
                           </div>
                           <div>
                             <div className="font-medium">{category.name}</div>
@@ -364,13 +417,21 @@ export function CategoriesPage() {
                         <div className="max-w-xs truncate">{category.description}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{category.providersCount}</Badge>
+                        {category.providersCount !== undefined ? (
+                          <Badge variant="secondary">{category.providersCount}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{category.jobsCount}</Badge>
+                        {category.jobsCount !== undefined ? (
+                          <Badge variant="secondary">{category.jobsCount}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        {category.active ? (
+                        {(category.active !== undefined ? category.active : (category as any).isActive !== undefined ? (category as any).isActive : true) ? (
                           <Badge variant="default">Active</Badge>
                         ) : (
                           <Badge variant="outline">Inactive</Badge>
@@ -385,17 +446,13 @@ export function CategoriesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" onClick={() => handleEditCategory(category)} />
+                            <DropdownMenuItem onClick={() => handleEditCategory(category)}>
+                              <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleToggleActive(category.id)}>
-                              {category.active ? (
+                              {(category.active !== undefined ? category.active : (category as any).isActive !== undefined ? (category as any).isActive : true) ? (
                                 <>
                                   <ToggleLeft className="mr-2 h-4 w-4" />
                                   Deactivate
@@ -487,17 +544,23 @@ export function CategoriesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-icon">Icon *</Label>
-              <Select value={editForm.icon} onValueChange={(value) => setEditForm(prev => ({ ...prev, icon: value }))}>
+              <Label htmlFor="edit-icon">Icon</Label>
+              <Select value={editForm.icon || 'anchor'} onValueChange={(value) => setEditForm(prev => ({ ...prev, icon: value }))}>
                 <SelectTrigger className={editErrors.icon ? 'border-destructive' : ''}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ICON_OPTIONS.map((icon) => (
-                    <SelectItem key={icon} value={icon}>
-                      {icon}
-                    </SelectItem>
-                  ))}
+                  {ICON_OPTIONS.map((icon) => {
+                    const IconComponent = iconMap[icon] || Anchor;
+                    return (
+                      <SelectItem key={icon} value={icon}>
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="h-4 w-4" />
+                          <span className="capitalize">{icon}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               {editErrors.icon && <p className="text-sm text-destructive">{editErrors.icon}</p>}
@@ -511,7 +574,7 @@ export function CategoriesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None (Top level)</SelectItem>
-                  {categories.map((category) => (
+                  {transformedCategories.filter(cat => cat.id !== editingCategory?.id).map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>

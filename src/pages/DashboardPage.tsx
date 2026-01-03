@@ -30,6 +30,43 @@ import { Analytics, Provider, Job, Blog, Approval } from '../types';
 import api from '../lib/api';
 import { useToast } from '@/hooks/use-toast';
 
+// Helper function to format location for display
+const formatLocation = (item: any): string => {
+  if (!item) return 'N/A';
+  
+  // If location is a string, use it directly
+  if (typeof item.location === 'string' && item.location.trim()) {
+    return item.location;
+  }
+  
+  // If location is a GeoJSON object, extract coordinates or use address
+  if (item.location && typeof item.location === 'object') {
+    // Check if it's a GeoJSON object with coordinates
+    if (item.location.coordinates && Array.isArray(item.location.coordinates)) {
+      // For Point type, coordinates are [longitude, latitude]
+      const [lng, lat] = item.location.coordinates;
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  }
+  
+  // If address object exists, use city and state
+  if (item.address && typeof item.address === 'object') {
+    const parts = [];
+    if (item.address.city && typeof item.address.city === 'string') {
+      parts.push(item.address.city);
+    }
+    if (item.address.state && typeof item.address.state === 'string') {
+      parts.push(item.address.state);
+    }
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+  }
+  
+  // Fallback
+  return 'N/A';
+};
+
 // Default analytics state to prevent undefined errors
 const DEFAULT_ANALYTICS_STATE: Analytics = {
   totalProviders: 0,
@@ -103,7 +140,11 @@ export function DashboardPage() {
         sortOrder: 'desc' 
       });
       if (providersResponse.success) {
-        setRecentProviders(providersResponse.data);
+        // PaginatedResponse has data as array directly
+        const providers = Array.isArray(providersResponse.data) 
+          ? providersResponse.data 
+          : (providersResponse.data?.data || []);
+        setRecentProviders(providers);
       }
 
       // Fetch recent jobs
@@ -113,7 +154,11 @@ export function DashboardPage() {
         sortOrder: 'desc' 
       });
       if (jobsResponse.success) {
-        setRecentJobs(jobsResponse.data);
+        // PaginatedResponse has data as array directly
+        const jobs = Array.isArray(jobsResponse.data) 
+          ? jobsResponse.data 
+          : (jobsResponse.data?.data || []);
+        setRecentJobs(jobs);
       }
 
       // Fetch pending approvals
@@ -122,7 +167,11 @@ export function DashboardPage() {
         limit: 10 
       });
       if (approvalsResponse.success) {
-        setPendingApprovals(approvalsResponse.data);
+        // PaginatedResponse has data as array directly
+        const approvals = Array.isArray(approvalsResponse.data) 
+          ? approvalsResponse.data 
+          : (approvalsResponse.data?.data || []);
+        setPendingApprovals(approvals);
       }
 
     } catch (error: any) {
@@ -305,7 +354,7 @@ export function DashboardPage() {
                   </div>
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-medium">{provider.name}</p>
-                    <p className="text-xs text-muted-foreground">{provider.location}</p>
+                    <p className="text-xs text-muted-foreground">{formatLocation(provider)}</p>
                   </div>
                   <Badge variant={provider.status === 'approved' ? 'default' : 'secondary'}>
                     {provider.status}
@@ -333,7 +382,7 @@ export function DashboardPage() {
                   </div>
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-medium">{job.title}</p>
-                    <p className="text-xs text-muted-foreground">{job.location}</p>
+                    <p className="text-xs text-muted-foreground">{formatLocation(job)}</p>
                   </div>
                   <Badge variant={job.status === 'published' ? 'default' : 'secondary'}>
                     {job.status}

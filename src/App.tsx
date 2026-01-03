@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 // Providers Pages (create placeholders for now)
 import ProvidersPage from "./pages/ProvidersPage";
 import CreateProviderPage from "./pages/CreateProviderPage";
+import EditProviderPage from "./pages/EditProviderPage";
 
 // Jobs Pages
 import JobsPage from "./pages/JobsPage";
@@ -55,6 +56,20 @@ import EmailTemplatesPage from "./pages/EmailTemplatesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
+import EnquiriesPage from "./pages/EnquiriesPage";
+import BookingsPage from "./pages/BookingsPage";
+import BookingDetailPage from "./pages/BookingDetailPage";
+import CreateBookingPage from "./pages/CreateBookingPage";
+import ContractsPage from "./pages/ContractsPage";
+import ContractDetailPage from "./pages/ContractDetailPage";
+import CreateContractPage from "./pages/CreateContractPage";
+import VesselsPage from "./pages/VesselsPage";
+import VesselDetailPage from "./pages/VesselDetailPage";
+import CreateVesselPage from "./pages/CreateVesselPage";
+import ProjectsPage from "./pages/ProjectsPage";
+import ProjectDetailPage from "./pages/ProjectDetailPage";
+import CreateProjectPage from "./pages/CreateProjectPage";
+import SocialLinksPage from "./pages/SocialLinksPage";
 
 const queryClient = new QueryClient();
 
@@ -104,6 +119,7 @@ const App = () => (
                 {/* Provider Management */}
                 <Route path="providers" element={<ProvidersPage />} />
                 <Route path="providers/create" element={<CreateProviderPage />} />
+                <Route path="providers/:id/edit" element={<EditProviderPage />} />
                 
                 {/* Job Management */}
                 <Route path="jobs" element={<JobsPage />} />
@@ -118,6 +134,32 @@ const App = () => (
                 
                 {/* Approvals */}
                 <Route path="approvals" element={<ApprovalsPage />} />
+                
+                {/* Enquiries */}
+                <Route path="enquiries" element={<EnquiriesPage />} />
+                
+                {/* Bookings */}
+                <Route path="bookings" element={<BookingsPage />} />
+                <Route path="bookings/create" element={<CreateBookingPage />} />
+                <Route path="bookings/:id" element={<BookingDetailPage />} />
+                
+                {/* Contracts */}
+                <Route path="contracts" element={<ContractsPage />} />
+                <Route path="contracts/create" element={<CreateContractPage />} />
+                <Route path="contracts/:id" element={<ContractDetailPage />} />
+                
+                {/* Vessels */}
+                <Route path="vessels" element={<VesselsPage />} />
+                <Route path="vessels/create" element={<CreateVesselPage />} />
+                <Route path="vessels/:id" element={<VesselDetailPage />} />
+                
+                {/* Projects */}
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="projects/create" element={<CreateProjectPage />} />
+                <Route path="projects/:id" element={<ProjectDetailPage />} />
+                
+                {/* Social Links */}
+                <Route path="social-links" element={<SocialLinksPage />} />
                 
                 {/* Email Templates */}
                 <Route path="email-templates" element={<EmailTemplatesPage />} />

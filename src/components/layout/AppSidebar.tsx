@@ -16,6 +16,12 @@ import {
   Waves,
   ChevronDown,
   User,
+  MessageSquare,
+  Calendar,
+  FileCheck,
+  Ship,
+  FolderKanban,
+  Share2,
 } from 'lucide-react';
 
 import {
@@ -123,13 +129,49 @@ const navigationItems = [
   {
     title: 'Approvals',
     url: ROUTES.APPROVALS,
-    icon: CheckSquare, // Assuming CheckSquare is a Lucide icon
+    icon: CheckSquare,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Enquiries',
+    url: ROUTES.ENQUIRIES,
+    icon: MessageSquare,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Bookings',
+    url: ROUTES.BOOKINGS,
+    icon: Calendar,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Contracts',
+    url: ROUTES.CONTRACTS,
+    icon: FileCheck,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Vessels',
+    url: ROUTES.VESSELS,
+    icon: Ship,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Projects',
+    url: ROUTES.PROJECTS,
+    icon: FolderKanban,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Social Links',
+    url: ROUTES.SOCIAL_LINKS,
+    icon: Share2,
     roles: ['superadmin', 'admin'],
   },
   {
     title: 'Email Templates',
     url: ROUTES.EMAIL_TEMPLATES,
-    icon: Mail, // Assuming Mail is a Lucide icon
+    icon: Mail,
     roles: ['superadmin', 'admin'],
   },
   {

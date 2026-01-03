@@ -83,6 +83,28 @@ export const ROUTES = {
   // Reports
   REPORTS: '/reports',
   ANALYTICS: '/analytics',
+  
+  // Enquiries
+  ENQUIRIES: '/enquiries',
+  
+  // Bookings
+  BOOKINGS: '/bookings',
+  BOOKING_DETAIL: '/bookings/:id',
+  
+  // Contracts
+  CONTRACTS: '/contracts',
+  CONTRACT_DETAIL: '/contracts/:id',
+  
+  // Vessels
+  VESSELS: '/vessels',
+  VESSEL_DETAIL: '/vessels/:id',
+  
+  // Projects
+  PROJECTS: '/projects',
+  PROJECT_DETAIL: '/projects/:id',
+  
+  // Social Links
+  SOCIAL_LINKS: '/social-links',
 } as const;
 
 export const ROLES = {

@@ -1,5 +1,5 @@
 // Generic CRUD hook for Marine-Axis Admin Panel
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useToast } from './use-toast';
 import { ApiResponse, PaginatedResponse, TableFilters } from '../types';
 import { SUCCESS_MESSAGES } from '../lib/constants';
@@ -97,13 +97,25 @@ export function useCRUD<T extends { id: string }>(
     try {
       updateState({ loading: true });
       
-      const filters = { ...state.filters, ...params };
+      // Merge params with state filters (params override state filters)
+      const filters = params ? { ...state.filters, ...params } : state.filters;
       const response = await api.list(filters);
       
       if (response.success) {
+        // Handle both direct array and PaginatedResponse structure
+        const items = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+        const pagination = response.pagination || response.data?.pagination || {
+          page: 1,
+          limit: 25,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        };
+        
         updateState({
-          items: response.data,
-          pagination: response.pagination,
+          items,
+          pagination,
           filters,
         });
       }
@@ -161,9 +173,28 @@ export function useCRUD<T extends { id: string }>(
       }
       return null;
     } catch (error: any) {
+      // Enhanced error message with validation details
+      let errorDescription = error.message || `Failed to create ${resource}`;
+      
+      // If there are detailed validation errors, show them
+      if (error.errors) {
+        try {
+          const errors = typeof error.errors === 'string' ? JSON.parse(error.errors) : error.errors;
+          if (Array.isArray(errors) && errors.length > 0) {
+            const fieldErrors = errors.map((err: any) => {
+              const field = err.path?.join('.') || 'field';
+              return `${field}: ${err.message}`;
+            });
+            errorDescription = `Validation errors: ${fieldErrors.join('; ')}`;
+          }
+        } catch (parseError) {
+          // If parsing fails, use the original message
+        }
+      }
+      
       toast({
         title: 'Create Error',
-        description: error.message || `Failed to create ${resource}`,
+        description: errorDescription,
         variant: 'destructive',
       });
       return null;
@@ -184,15 +215,19 @@ export function useCRUD<T extends { id: string }>(
           description: messages.updated || SUCCESS_MESSAGES.UPDATED,
         });
         
-        // Update the item in the list
+        // Update the item in the list - ensure id matches (handle both _id and id)
+        const updatedItem = response.data;
+        const itemId = (updatedItem as any)._id ? String((updatedItem as any)._id) : (updatedItem as any).id || id;
+        
         updateState({
-          items: state.items.map(item => 
-            item.id === id ? response.data : item
-          ),
-          item: state.item?.id === id ? response.data : state.item,
+          items: state.items.map(item => {
+            const currentId = (item as any)._id ? String((item as any)._id) : item.id;
+            return currentId === itemId ? updatedItem : item;
+          }),
+          item: state.item && ((state.item as any)._id ? String((state.item as any)._id) : state.item.id) === itemId ? updatedItem : state.item,
         });
         
-        return response.data;
+        return updatedItem;
       }
       return null;
     } catch (error: any) {
@@ -242,10 +277,15 @@ export function useCRUD<T extends { id: string }>(
 
   // State management
   const setFilters = useCallback((filters: Partial<TableFilters>) => {
-    const newFilters = { ...state.filters, ...filters };
-    updateState({ filters: newFilters });
-    fetchItems(newFilters);
-  }, [fetchItems, state.filters, updateState]);
+    setState((prevState) => {
+      const newFilters = { ...prevState.filters, ...filters };
+      // Schedule fetchItems to run after state update
+      Promise.resolve().then(() => {
+        fetchItems(newFilters);
+      });
+      return { ...prevState, filters: newFilters };
+    });
+  }, [fetchItems]);
 
   const resetFilters = useCallback(() => {
     const defaultFilters: TableFilters = {

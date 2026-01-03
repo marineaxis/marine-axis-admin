@@ -19,6 +19,33 @@ import { Provider } from '../types';
 import useCRUD from '../hooks/useCRUD';
 import api from '../lib/api';
 
+// Helper function to format location for display
+const formatLocation = (provider: any): string => {
+  if (!provider) return 'N/A';
+  
+  // If location is a string, use it directly
+  if (typeof provider.location === 'string' && provider.location.trim()) {
+    return provider.location;
+  }
+  
+  // If address object exists, use city and state
+  if (provider.address && typeof provider.address === 'object') {
+    const parts = [];
+    if (provider.address.city && typeof provider.address.city === 'string') {
+      parts.push(provider.address.city);
+    }
+    if (provider.address.state && typeof provider.address.state === 'string') {
+      parts.push(provider.address.state);
+    }
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+  }
+  
+  // Fallback
+  return 'N/A';
+};
+
 export function ProvidersPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -26,21 +53,14 @@ export function ProvidersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: '', email: '', phone: '', location: '', description: '', website: ''
-  });
-  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   // Use CRUD hook for provider management
   const {
     items: providers,
     loading,
-    updating,
     deleting,
     fetchItems,
-    updateItem,
     deleteItem,
     setFilters,
   } = useCRUD<Provider>({
@@ -52,12 +72,10 @@ export function ProvidersPage() {
     },
   });
 
-  // Fetch providers on component mount
-  React.useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  // Apply filters when search or filter values change
+  // Apply filters when search or filter values change (use useRef to prevent infinite loop)
+  const filtersRef = React.useRef<{ search?: string; status?: string } | null>(null);
+  const isInitialMount = React.useRef(true);
+  
   React.useEffect(() => {
     const filters: any = {};
     
@@ -69,11 +87,19 @@ export function ProvidersPage() {
       filters.status = statusFilter;
     }
     
-    setFilters(filters);
-  }, [searchQuery, statusFilter, setFilters]);
+    // Only call setFilters if filters actually changed, or on initial mount
+    const filtersString = JSON.stringify(filters);
+    const refString = filtersRef.current ? JSON.stringify(filtersRef.current) : null;
+    
+    if (isInitialMount.current || filtersString !== refString) {
+      filtersRef.current = filters;
+      setFilters(filters);
+      isInitialMount.current = false;
+    }
+  }, [searchQuery, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter providers
-  const filteredProviders = providers;
+  // Filter providers (ensure it's always an array)
+  const filteredProviders = Array.isArray(providers) ? providers : [];
 
   const handleApprove = async (providerId: string) => {
     try {
@@ -147,52 +173,9 @@ export function ProvidersPage() {
   };
 
   const handleEditProvider = (provider: Provider) => {
-    setSelectedProvider(provider);
-    setEditForm({
-      name: provider.name,
-      email: provider.email,
-      phone: provider.phone,
-      location: provider.location,
-      description: provider.description,
-      website: provider.website || ''
-    });
-    setEditErrors({});
-    setEditDialogOpen(true);
+    navigate(`/providers/${provider.id}/edit`);
   };
 
-  const validateEditForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!editForm.name.trim()) newErrors.name = 'Name is required';
-    if (!editForm.email.trim()) newErrors.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email)) newErrors.email = 'Invalid email format';
-    if (!editForm.phone.trim()) newErrors.phone = 'Phone is required';
-    if (!editForm.location.trim()) newErrors.location = 'Location is required';
-    if (!editForm.description.trim()) newErrors.description = 'Description is required';
-    
-    setEditErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleUpdateProvider = async () => {
-    if (!validateEditForm() || !selectedProvider) return;
-
-    const updateData = {
-      name: editForm.name.trim(),
-      email: editForm.email.trim(),
-      phone: editForm.phone.trim(),
-      location: editForm.location.trim(),
-      description: editForm.description.trim(),
-      website: editForm.website.trim() || undefined,
-    };
-
-    const result = await updateItem(selectedProvider.id, updateData);
-    
-    if (result) {
-      
-      setEditDialogOpen(false);
-      setSelectedProvider(null);
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -313,7 +296,7 @@ export function ProvidersPage() {
                           <div className="text-sm text-muted-foreground">{provider.phone}</div>
                         </div>
                       </TableCell>
-                      <TableCell>{provider.location}</TableCell>
+                      <TableCell>{formatLocation(provider)}</TableCell>
                       <TableCell>{getStatusBadge(provider.status)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -421,7 +404,7 @@ export function ProvidersPage() {
                     <div><span className="font-medium">Name:</span> {selectedProvider.name}</div>
                     <div><span className="font-medium">Email:</span> {selectedProvider.email}</div>
                     <div><span className="font-medium">Phone:</span> {selectedProvider.phone}</div>
-                    <div><span className="font-medium">Location:</span> {selectedProvider.location}</div>
+                    <div><span className="font-medium">Location:</span> {formatLocation(selectedProvider)}</div>
                     <div><span className="font-medium">Website:</span> {selectedProvider.website || 'Not provided'}</div>
                   </div>
                 </div>
@@ -461,93 +444,6 @@ export function ProvidersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Provider Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Provider</DialogTitle>
-            <DialogDescription>
-              Update provider information
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Name *</Label>
-              <Input
-                id="edit-name"
-                value={editForm.name}
-                onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                className={editErrors.name ? 'border-destructive' : ''}
-              />
-              {editErrors.name && <p className="text-sm text-destructive">{editErrors.name}</p>}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email *</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={editForm.email}
-                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                className={editErrors.email ? 'border-destructive' : ''}
-              />
-              {editErrors.email && <p className="text-sm text-destructive">{editErrors.email}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone *</Label>
-              <Input
-                id="edit-phone"
-                value={editForm.phone}
-                onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
-                className={editErrors.phone ? 'border-destructive' : ''}
-              />
-              {editErrors.phone && <p className="text-sm text-destructive">{editErrors.phone}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-location">Location *</Label>
-              <Input
-                id="edit-location"
-                value={editForm.location}
-                onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
-                className={editErrors.location ? 'border-destructive' : ''}
-              />
-              {editErrors.location && <p className="text-sm text-destructive">{editErrors.location}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description *</Label>
-              <Textarea
-                id="edit-description"
-                value={editForm.description}
-                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                className={editErrors.description ? 'border-destructive' : ''}
-                rows={3}
-              />
-              {editErrors.description && <p className="text-sm text-destructive">{editErrors.description}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-website">Website</Label>
-              <Input
-                id="edit-website"
-                value={editForm.website}
-                onChange={(e) => setEditForm(prev => ({ ...prev, website: e.target.value }))}
-                placeholder="https://example.com"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateProvider} disabled={updating}>
-              Update Provider
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
