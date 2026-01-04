@@ -97,8 +97,7 @@ export function useCRUD<T extends { id: string }>(
     try {
       updateState({ loading: true });
       
-      // Merge params with state filters (params override state filters)
-      const filters = params ? { ...state.filters, ...params } : state.filters;
+      const filters = params || { page: 1, limit: 25, sortOrder: 'desc' };
       const response = await api.list(filters);
       
       if (response.success) {
@@ -128,7 +127,7 @@ export function useCRUD<T extends { id: string }>(
     } finally {
       updateState({ loading: false });
     }
-  }, [api, resource, state.filters, toast, updateState]);
+  }, [api, resource, toast, updateState]);
 
   const fetchItem = useCallback(async (id: string): Promise<T | null> => {
     try {
@@ -277,13 +276,10 @@ export function useCRUD<T extends { id: string }>(
 
   // State management
   const setFilters = useCallback((filters: Partial<TableFilters>) => {
-    setState((prevState) => {
-      const newFilters = { ...prevState.filters, ...filters };
-      // Schedule fetchItems to run after state update
-      Promise.resolve().then(() => {
-        fetchItems(newFilters);
-      });
-      return { ...prevState, filters: newFilters };
+    setState(prev => {
+      const newFilters = { ...prev.filters, ...filters };
+      fetchItems(newFilters);
+      return { ...prev, filters: newFilters };
     });
   }, [fetchItems]);
 
@@ -293,9 +289,11 @@ export function useCRUD<T extends { id: string }>(
       limit: 25,
       sortOrder: 'desc',
     };
-    updateState({ filters: defaultFilters });
-    fetchItems(defaultFilters);
-  }, [fetchItems, updateState]);
+    setState(prev => {
+      fetchItems(defaultFilters);
+      return { ...prev, filters: defaultFilters };
+    });
+  }, [fetchItems]);
 
   const setItem = useCallback((item: T | null) => {
     updateState({ item });
