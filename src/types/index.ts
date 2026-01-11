@@ -41,26 +41,47 @@ export interface Provider {
 export interface Job {
   id: string;
   title: string;
-  description: string;
-  providerId: string;
-  provider?: Provider;
-  categoryIds: string[];
-  location: string;
-  salaryRange: {
+  description?: string;
+  providerId?: string;
+  provider?: Provider | { id?: string; name?: string; companyName?: string };
+  category?: string;
+  categoryIds?: string[];
+  location?: string | { type: 'Point'; coordinates: [number, number] };
+  address?: {
+    street?: string;
+    city: string;
+    state: string;
+    country: string;
+  };
+  salary?: {
+    min: number;
+    max: number;
+    currency: string;
+    period: 'hourly' | 'daily' | 'monthly' | 'annually';
+  };
+  salaryRange?: {
     min: number;
     max: number;
     currency: string;
   };
-  requirements: string[];
-  benefits: string[];
-  type: 'full-time' | 'part-time' | 'contract' | 'internship';
-  remote: boolean;
-  urgency: 'low' | 'medium' | 'high';
-  status: 'draft' | 'published' | 'closed' | 'paused';
-  expiresAt: string;
-  applications: number;
-  createdAt: string;
-  updatedAt: string;
+  requirements?: string[];
+  responsibilities?: string[];
+  benefits?: string[];
+  tags?: string[];
+  jobType?: 'full-time' | 'part-time' | 'contract' | 'freelance';
+  type?: 'full-time' | 'part-time' | 'contract' | 'freelance';
+  experience?: 'entry' | 'mid' | 'senior' | 'executive';
+  contactEmail?: string;
+  contactPhone?: string;
+  featured?: boolean;
+  status?: string;
+  remote?: boolean;
+  urgency?: 'low' | 'medium' | 'high';
+  expiresAt?: string;
+  applications?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  slug?: string;
 }
 
 export interface Category {

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Plus, X, Eye, EyeOff, ImageIcon, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Loader2, Plus, X, Upload, Image as ImageIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,20 +9,24 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import useCRUD from '@/hooks/useCRUD';
 import api from '@/lib/api';
 import { Blog } from '@/types';
 
-export function CreateBlogPage() {
+export function EditBlogPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const { createItem, creating } = useCRUD<Blog>({
+  const { id } = useParams<{ id: string }>();
+  const [blogData, setBlogData] = useState<Blog | null>(null);
+  const [loadingBlog, setLoadingBlog] = useState(true);
+
+  const { updateItem, updating } = useCRUD<Blog>({
     resource: 'blogs',
     api: api.blogs,
     messages: {
-      created: 'Blog created successfully',
+      updated: 'Blog updated successfully',
     },
   });
 
@@ -46,11 +50,60 @@ export function CreateBlogPage() {
   const [currentGalleryFile, setCurrentGalleryFile] = useState<File | null>(null);
   const [currentImageCaption, setCurrentImageCaption] = useState('');
   const [uploadingGallery, setUploadingGallery] = useState(false);
-  const [showSeoPreview, setShowSeoPreview] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [createdBlogId, setCreatedBlogId] = useState<string | null>(null);
-  // Store pending gallery files (File objects) before blog is created
-  const [pendingGalleryFiles, setPendingGalleryFiles] = useState<Array<{ file: File; caption: string; previewUrl: string }>>([]);
+
+  useEffect(() => {
+    const fetchBlog = async () => {
+      if (!id) {
+        toast({
+          title: 'Error',
+          description: 'Blog ID is missing.',
+          variant: 'destructive',
+        });
+        navigate('/blogs');
+        return;
+      }
+      try {
+        setLoadingBlog(true);
+        const response = await api.blogs.get(id);
+        if (response.success) {
+          const blog = response.data;
+          setBlogData(blog);
+          setFormData({
+            title: blog.title || '',
+            excerpt: blog.excerpt || '',
+            content: blog.content || '',
+            tags: blog.tags || [],
+            featured: blog.featured || false,
+            status: blog.status || 'draft',
+            seo: {
+              metaTitle: (blog.seo as any)?.metaTitle || '',
+              metaDescription: (blog.seo as any)?.metaDescription || '',
+              keywords: (blog.seo as any)?.keywords || [],
+            },
+            gallery: (blog as any).gallery || [],
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: response.message || 'Failed to fetch blog details.',
+            variant: 'destructive',
+          });
+          navigate('/blogs');
+        }
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to fetch blog details.',
+          variant: 'destructive',
+        });
+        navigate('/blogs');
+      } finally {
+        setLoadingBlog(false);
+      }
+    };
+    fetchBlog();
+  }, [id, navigate, toast]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -60,10 +113,6 @@ export function CreateBlogPage() {
     if (!formData.content.trim()) newErrors.content = 'Content is required';
     if (formData.tags.length === 0) newErrors.tags = 'At least one tag is required';
 
-    // SEO validation
-    if (formData.title.length > 60) newErrors.title = 'Title should be under 60 characters for SEO';
-    if (formData.excerpt.length > 160) newErrors.excerpt = 'Excerpt should be under 160 characters for SEO';
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -72,20 +121,6 @@ export function CreateBlogPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-
-    // Auto-generate SEO fields
-    if (field === 'title' && !formData.seo.metaTitle) {
-      setFormData(prev => ({
-        ...prev,
-        seo: { ...prev.seo, metaTitle: value }
-      }));
-    }
-    if (field === 'excerpt' && !formData.seo.metaDescription) {
-      setFormData(prev => ({
-        ...prev,
-        seo: { ...prev.seo, metaDescription: value }
-      }));
     }
   };
 
@@ -103,9 +138,6 @@ export function CreateBlogPage() {
         tags: [...prev.tags, currentTag.trim()],
       }));
       setCurrentTag('');
-      if (errors.tags) {
-        setErrors(prev => ({ ...prev, tags: '' }));
-      }
     }
   };
 
@@ -146,40 +178,8 @@ export function CreateBlogPage() {
   };
 
   const handleAddGalleryItem = async () => {
-    if (!currentGalleryFile) {
+    if (!currentGalleryFile || !id) {
       toast({ title: 'Error', description: 'Please select a file to upload.', variant: 'destructive' });
-      return;
-    }
-    
-    // If blog hasn't been created yet, store the file locally for later upload
-    if (!createdBlogId) {
-      const previewUrl = URL.createObjectURL(currentGalleryFile);
-      setPendingGalleryFiles(prev => [...prev, {
-        file: currentGalleryFile,
-        caption: currentImageCaption,
-        previewUrl,
-      }]);
-      
-      // Add to gallery with preview URL (will be replaced with actual URL after upload)
-      const tempGalleryItem = {
-        url: previewUrl,
-        key: `temp-${Date.now()}-${currentGalleryFile.name}`,
-        caption: currentImageCaption,
-        order: formData.gallery.length + 1,
-      };
-      
-      setFormData(prev => ({
-        ...prev,
-        gallery: [...prev.gallery, tempGalleryItem],
-      }));
-      
-      setCurrentGalleryFile(null);
-      setCurrentImageCaption('');
-      toast({ 
-        title: 'Image added', 
-        description: 'Image will be uploaded when you save the blog.', 
-        variant: 'default' 
-      });
       return;
     }
     
@@ -187,7 +187,7 @@ export function CreateBlogPage() {
     try {
       // Step 1: Get presigned upload URL
       const uploadUrlResponse = await api.blogs.generateUploadUrl(
-        createdBlogId,
+        id,
         currentGalleryFile.name,
         currentGalleryFile.type
       );
@@ -205,7 +205,7 @@ export function CreateBlogPage() {
         headers: {
           'Content-Type': currentGalleryFile.type,
           'X-File-Name': currentGalleryFile.name,
-          'X-Folder': `blogs/${createdBlogId}/gallery`,
+          'X-Folder': `blogs/${id}/gallery`,
         },
       });
       
@@ -245,19 +245,6 @@ export function CreateBlogPage() {
   };
 
   const handleRemoveGalleryItem = (key: string) => {
-    // Find the item being removed to check if it's a pending file
-    const itemToRemove = formData.gallery.find(item => item.key === key);
-    
-    // If it's a pending file, remove from pending list and revoke preview URL
-    if (itemToRemove && itemToRemove.key.startsWith('temp-')) {
-      const pendingItem = pendingGalleryFiles.find(item => item.previewUrl === itemToRemove.url);
-      if (pendingItem) {
-        URL.revokeObjectURL(pendingItem.previewUrl);
-        setPendingGalleryFiles(prev => prev.filter(item => item !== pendingItem));
-      }
-    }
-    
-    // Remove from gallery
     setFormData(prev => ({
       ...prev,
       gallery: prev.gallery.filter(item => item.key !== key),
@@ -267,12 +254,12 @@ export function CreateBlogPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!validateForm() || !id) {
       return;
     }
 
     try {
-      const blogData: any = {
+      const updateData: any = {
         title: formData.title.trim(),
         excerpt: formData.excerpt.trim(),
         content: formData.content.trim(),
@@ -287,91 +274,12 @@ export function CreateBlogPage() {
         gallery: formData.gallery.length > 0 ? formData.gallery : undefined,
       };
 
-      const result = await createItem(blogData);
+      const result = await updateItem(id, updateData);
       if (result) {
-        setCreatedBlogId(result.id);
-        
-        // Upload pending gallery files if any
-        if (pendingGalleryFiles.length > 0 && result.id) {
-          setUploadingGallery(true);
-          try {
-            const uploadedGalleryItems = [];
-            
-            for (const pendingItem of pendingGalleryFiles) {
-              // Get presigned upload URL
-              const uploadUrlResponse = await api.blogs.generateUploadUrl(
-                result.id,
-                pendingItem.file.name,
-                pendingItem.file.type
-              );
-              
-              if (!uploadUrlResponse.success || !uploadUrlResponse.data?.uploadUrl) {
-                console.error('Failed to get upload URL for:', pendingItem.file.name);
-                continue;
-              }
-              
-              const { uploadUrl, key } = uploadUrlResponse.data;
-              
-              // Upload file
-              const uploadResponse = await fetch(uploadUrl, {
-                method: 'PUT',
-                body: pendingItem.file,
-                headers: {
-                  'Content-Type': pendingItem.file.type,
-                  'X-File-Name': pendingItem.file.name,
-                  'X-Folder': `blogs/${result.id}/gallery`,
-                },
-              });
-              
-              if (!uploadResponse.ok) {
-                console.error('Failed to upload:', pendingItem.file.name);
-                continue;
-              }
-              
-              const uploadResult = await uploadResponse.json();
-              const fileUrl = uploadResult.data?.url || uploadResult.data?.downloadUrl;
-              
-              if (fileUrl) {
-                uploadedGalleryItems.push({
-                  url: fileUrl,
-                  key: uploadResult.data?.key || key || pendingItem.file.name,
-                  caption: pendingItem.caption,
-                  order: uploadedGalleryItems.length + 1,
-                });
-                
-                // Clean up preview URL
-                URL.revokeObjectURL(pendingItem.previewUrl);
-              }
-            }
-            
-            // Update blog with uploaded gallery items
-            if (uploadedGalleryItems.length > 0) {
-              await api.blogs.updateGallery(result.id, uploadedGalleryItems);
-            }
-            
-            setPendingGalleryFiles([]);
-          } catch (error: any) {
-            console.error('Error uploading pending gallery files:', error);
-            toast({
-              title: 'Warning',
-              description: 'Blog created but some images failed to upload. You can add them later.',
-              variant: 'default',
-            });
-          } finally {
-            setUploadingGallery(false);
-          }
-        }
-        
-        // If there are already uploaded gallery items (from previous uploads), update the blog
-        const existingGalleryItems = formData.gallery.filter(item => !item.key.startsWith('temp-'));
-        if (existingGalleryItems.length > 0 && result.id) {
-          await api.blogs.updateGallery(result.id, existingGalleryItems);
-        }
-        
         navigate('/blogs');
       }
     } catch (error: any) {
-      console.error('Create blog error:', error);
+      console.error('Update blog error:', error);
     }
   };
 
@@ -384,9 +292,24 @@ export function CreateBlogPage() {
     );
   };
 
+  if (loadingBlog) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!blogData) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Blog not found or could not be loaded.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -398,8 +321,8 @@ export function CreateBlogPage() {
           Back to Blogs
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Create Blog Post</h1>
-          <p className="text-muted-foreground">Write and publish a new blog post</p>
+          <h1 className="text-3xl font-bold">Edit Blog Post</h1>
+          <p className="text-muted-foreground">Update details for {blogData.title}</p>
         </div>
       </div>
 
@@ -408,12 +331,9 @@ export function CreateBlogPage() {
         <Card>
           <CardHeader>
             <CardTitle>Blog Content</CardTitle>
-            <CardDescription>
-              Enter the main content for your blog post
-            </CardDescription>
+            <CardDescription>Update the main content for your blog post</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="title">Title *</Label>
@@ -443,9 +363,6 @@ export function CreateBlogPage() {
                 className={errors.excerpt ? 'border-destructive' : ''}
               />
               {errors.excerpt && <p className="text-sm text-destructive">{errors.excerpt}</p>}
-              <p className="text-xs text-muted-foreground">
-                This will be displayed in blog previews and search results
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -459,9 +376,23 @@ export function CreateBlogPage() {
                 className={errors.content ? 'border-destructive' : ''}
               />
               {errors.content && <p className="text-sm text-destructive">{errors.content}</p>}
-              <p className="text-xs text-muted-foreground">
-                Estimated reading time: {Math.ceil(formData.content.split(' ').length / 200)} minutes
-              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value: 'draft' | 'published' | 'archived') => handleInputChange('status', value)}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -470,9 +401,7 @@ export function CreateBlogPage() {
         <Card>
           <CardHeader>
             <CardTitle>Tags and Settings</CardTitle>
-            <CardDescription>
-              Categorize your blog post and set visibility options
-            </CardDescription>
+            <CardDescription>Categorize your blog post and set visibility options</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -518,27 +447,81 @@ export function CreateBlogPage() {
           </CardContent>
         </Card>
 
+        {/* Gallery */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Gallery Images</CardTitle>
+            <CardDescription>Upload images to showcase in your blog post</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <Input
+                id="gallery-file-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleGalleryFileUpload}
+                className="flex-grow"
+                disabled={uploadingGallery}
+              />
+              <Input
+                placeholder="Image caption (optional)"
+                value={currentImageCaption}
+                onChange={(e) => setCurrentImageCaption(e.target.value)}
+                className="flex-grow"
+                disabled={uploadingGallery}
+              />
+              <Button 
+                type="button" 
+                onClick={handleAddGalleryItem} 
+                disabled={!currentGalleryFile || uploadingGallery}
+                className="gap-2"
+              >
+                {uploadingGallery ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload Image
+                  </>
+                )}
+              </Button>
+            </div>
+            {formData.gallery && formData.gallery.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {formData.gallery.map((item, index) => (
+                  <div key={item.key || index} className="relative group">
+                    <img 
+                      src={item.url} 
+                      alt={item.caption || 'Gallery image'} 
+                      className="w-full h-32 object-cover rounded-md border"
+                    />
+                    {item.caption && (
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{item.caption}</p>
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
+                      onClick={() => handleRemoveGalleryItem(item.key)}
+                      type="button"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* SEO Settings */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>SEO Settings</CardTitle>
-                <CardDescription>
-                  Optimize your blog post for search engines
-                </CardDescription>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSeoPreview(!showSeoPreview)}
-                className="gap-2"
-              >
-                {showSeoPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                {showSeoPreview ? 'Hide' : 'Show'} Preview
-              </Button>
-            </div>
+            <CardTitle>SEO Settings</CardTitle>
+            <CardDescription>Optimize your blog post for search engines</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -548,7 +531,7 @@ export function CreateBlogPage() {
               </div>
               <Input
                 id="metaTitle"
-                placeholder="SEO title (auto-generated from title)"
+                placeholder="SEO title"
                 value={formData.seo.metaTitle || ''}
                 onChange={(e) => handleSeoChange('metaTitle', e.target.value)}
               />
@@ -561,7 +544,7 @@ export function CreateBlogPage() {
               </div>
               <Textarea
                 id="metaDescription"
-                placeholder="SEO description (auto-generated from excerpt)"
+                placeholder="SEO description"
                 rows={2}
                 value={formData.seo.metaDescription || ''}
                 onChange={(e) => handleSeoChange('metaDescription', e.target.value)}
@@ -598,107 +581,20 @@ export function CreateBlogPage() {
                 </div>
               )}
             </div>
-
-            {/* SEO Preview */}
-            {showSeoPreview && (
-              <div className="border rounded-lg p-4 bg-muted/50">
-                <h4 className="font-medium mb-2">Search Engine Preview</h4>
-                <div className="space-y-1">
-                  <div className="text-blue-600 text-lg">{formData.seo.metaTitle || formData.title || 'Blog Title'}</div>
-                  <div className="text-green-600 text-sm">marine-axis.com › blog › {formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}</div>
-                  <div className="text-gray-600 text-sm">{formData.seo.metaDescription || formData.excerpt || 'Blog description...'}</div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Gallery */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Gallery Images</CardTitle>
-            <CardDescription>Upload images to showcase in your blog post (save blog first)</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <Input
-                id="gallery-file-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleGalleryFileUpload}
-                className="flex-grow"
-                disabled={uploadingGallery || !createdBlogId}
-              />
-              <Input
-                placeholder="Image caption (optional)"
-                value={currentImageCaption}
-                onChange={(e) => setCurrentImageCaption(e.target.value)}
-                className="flex-grow"
-                disabled={uploadingGallery || !createdBlogId}
-              />
-              <Button 
-                type="button" 
-                onClick={handleAddGalleryItem} 
-                disabled={!currentGalleryFile || uploadingGallery || !createdBlogId}
-                className="gap-2"
-              >
-                {uploadingGallery ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    Upload Image
-                  </>
-                )}
-              </Button>
-            </div>
-            {!createdBlogId && pendingGalleryFiles.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {pendingGalleryFiles.length} image(s) will be uploaded when you save the blog
-              </p>
-            )}
-            {formData.gallery && formData.gallery.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {formData.gallery.map((item, index) => (
-                  <div key={item.key || index} className="relative group">
-                    <img 
-                      src={item.url} 
-                      alt={item.caption || 'Gallery image'} 
-                      className="w-full h-32 object-cover rounded-md border"
-                    />
-                    {item.caption && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{item.caption}</p>
-                    )}
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
-                      onClick={() => handleRemoveGalleryItem(item.key)}
-                      type="button"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 
         {/* Submit Buttons */}
         <div className="flex items-center gap-4">
-          <Button type="submit" disabled={creating} className="min-w-32">
-            {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Blog
+          <Button type="submit" disabled={updating} className="min-w-32">
+            {updating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Update Blog
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => navigate('/blogs')}
-            disabled={creating}
+            disabled={updating}
           >
             Cancel
           </Button>
@@ -708,4 +604,5 @@ export function CreateBlogPage() {
   );
 }
 
-export default CreateBlogPage;
+export default EditBlogPage;
+

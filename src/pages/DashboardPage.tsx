@@ -162,8 +162,7 @@ export function DashboardPage() {
       }
 
       // Fetch pending approvals
-      const approvalsResponse = await api.approvals.list({ 
-        status: 'pending',
+      const approvalsResponse = await api.approvals.getPending({ 
         limit: 10 
       });
       if (approvalsResponse.success) {
@@ -249,11 +248,19 @@ export function DashboardPage() {
 
   const getApprovalTypeLabel = (type: string) => {
     switch (type) {
-      case 'provider_registration': return 'Provider Registration';
-      case 'provider_edit': return 'Provider Edit';
-      case 'job_posting': return 'Job Posting';
-      case 'blog_post': return 'Blog Post';
-      default: return type;
+      case 'provider':
+      case 'provider_registration': 
+        return 'Provider';
+      case 'provider_edit': 
+        return 'Provider Edit';
+      case 'job':
+      case 'job_posting': 
+        return 'Job';
+      case 'blog':
+      case 'blog_post': 
+        return 'Blog';
+      default: 
+        return type.charAt(0).toUpperCase() + type.slice(1);
     }
   };
 
@@ -418,25 +425,32 @@ export function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendingApprovals.map((approval) => (
+                {pendingApprovals.map((approval: any) => (
                   <TableRow key={approval.id}>
                     <TableCell>
                       {getApprovalTypeLabel(approval.type)}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {(approval.entity as any)?.name || (approval.entity as any)?.title || 'Unknown'}
+                      {approval.title || approval.companyName || approval.contactName || (approval.entity as any)?.name || (approval.entity as any)?.title || 'Unknown'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getPriorityColor(approval.priority) as any}>
-                        {approval.priority}
+                      <Badge variant={getPriorityColor(approval.priority || 'medium') as any}>
+                        {approval.priority || 'medium'}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(approval.createdAt).toLocaleDateString()}
+                      {approval.submittedAt 
+                        ? new Date(approval.submittedAt).toLocaleDateString()
+                        : approval.createdAt 
+                          ? new Date(approval.createdAt).toLocaleDateString()
+                          : '—'
+                      }
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline">
-                        Review
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={`/approvals`}>
+                          Review
+                        </a>
                       </Button>
                     </TableCell>
                   </TableRow>

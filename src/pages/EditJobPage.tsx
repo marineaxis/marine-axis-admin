@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Plus, X, DollarSign, MapPin, Mail, Phone, Calendar as CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Loader2, Plus, X, DollarSign, MapPin, Mail, Phone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import useCRUD from '@/hooks/useCRUD';
 import api from '@/lib/api';
@@ -37,7 +33,6 @@ interface JobFormData {
     currency: string;
     period: 'hourly' | 'daily' | 'monthly' | 'annually';
   };
-  expiryDate?: Date;
   contactEmail: string;
   contactPhone?: string;
   requirements: string[];
@@ -46,142 +41,23 @@ interface JobFormData {
   tags: string[];
 }
 
-// Common countries list
-const COUNTRIES = [
-  'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Italy', 'Spain',
-  'Netherlands', 'Belgium', 'Switzerland', 'Austria', 'Sweden', 'Norway', 'Denmark', 'Finland',
-  'Poland', 'Portugal', 'Greece', 'Ireland', 'New Zealand', 'Japan', 'South Korea', 'Singapore',
-  'Malaysia', 'Thailand', 'Indonesia', 'Philippines', 'Vietnam', 'India', 'China', 'Hong Kong',
-  'United Arab Emirates', 'Saudi Arabia', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'South Africa',
-  'Egypt', 'Nigeria', 'Kenya', 'Brazil', 'Argentina', 'Chile', 'Mexico', 'Colombia', 'Peru',
-  'Turkey', 'Israel', 'Russia', 'Ukraine', 'Czech Republic', 'Hungary', 'Romania', 'Bulgaria',
-  'Croatia', 'Slovenia', 'Estonia', 'Latvia', 'Lithuania', 'Iceland', 'Luxembourg', 'Malta',
-  'Cyprus', 'Monaco', 'Liechtenstein', 'Andorra', 'San Marino', 'Vatican City'
-].sort();
-
-// Comprehensive currency list
-const CURRENCIES = [
-  { code: 'USD', name: 'US Dollar' },
-  { code: 'EUR', name: 'Euro' },
-  { code: 'GBP', name: 'British Pound' },
-  { code: 'JPY', name: 'Japanese Yen' },
-  { code: 'AUD', name: 'Australian Dollar' },
-  { code: 'CAD', name: 'Canadian Dollar' },
-  { code: 'CHF', name: 'Swiss Franc' },
-  { code: 'CNY', name: 'Chinese Yuan' },
-  { code: 'INR', name: 'Indian Rupee' },
-  { code: 'SGD', name: 'Singapore Dollar' },
-  { code: 'HKD', name: 'Hong Kong Dollar' },
-  { code: 'NZD', name: 'New Zealand Dollar' },
-  { code: 'SEK', name: 'Swedish Krona' },
-  { code: 'NOK', name: 'Norwegian Krone' },
-  { code: 'DKK', name: 'Danish Krone' },
-  { code: 'PLN', name: 'Polish Zloty' },
-  { code: 'ZAR', name: 'South African Rand' },
-  { code: 'BRL', name: 'Brazilian Real' },
-  { code: 'MXN', name: 'Mexican Peso' },
-  { code: 'ARS', name: 'Argentine Peso' },
-  { code: 'CLP', name: 'Chilean Peso' },
-  { code: 'AED', name: 'UAE Dirham' },
-  { code: 'SAR', name: 'Saudi Riyal' },
-  { code: 'QAR', name: 'Qatari Riyal' },
-  { code: 'KWD', name: 'Kuwaiti Dinar' },
-  { code: 'BHD', name: 'Bahraini Dinar' },
-  { code: 'OMR', name: 'Omani Rial' },
-  { code: 'JOD', name: 'Jordanian Dinar' },
-  { code: 'EGP', name: 'Egyptian Pound' },
-  { code: 'TRY', name: 'Turkish Lira' },
-  { code: 'RUB', name: 'Russian Ruble' },
-  { code: 'KRW', name: 'South Korean Won' },
-  { code: 'THB', name: 'Thai Baht' },
-  { code: 'MYR', name: 'Malaysian Ringgit' },
-  { code: 'IDR', name: 'Indonesian Rupiah' },
-  { code: 'PHP', name: 'Philippine Peso' },
-  { code: 'VND', name: 'Vietnamese Dong' },
-  { code: 'PKR', name: 'Pakistani Rupee' },
-  { code: 'BDT', name: 'Bangladeshi Taka' },
-  { code: 'LKR', name: 'Sri Lankan Rupee' },
-  { code: 'NPR', name: 'Nepalese Rupee' },
-  { code: 'MMK', name: 'Myanmar Kyat' },
-  { code: 'KES', name: 'Kenyan Shilling' },
-  { code: 'NGN', name: 'Nigerian Naira' },
-  { code: 'GHS', name: 'Ghanaian Cedi' },
-  { code: 'UGX', name: 'Ugandan Shilling' },
-  { code: 'TZS', name: 'Tanzanian Shilling' },
-  { code: 'ETB', name: 'Ethiopian Birr' },
-  { code: 'MAD', name: 'Moroccan Dirham' },
-  { code: 'TND', name: 'Tunisian Dinar' },
-  { code: 'DZD', name: 'Algerian Dinar' },
-  { code: 'ILS', name: 'Israeli Shekel' },
-  { code: 'CZK', name: 'Czech Koruna' },
-  { code: 'HUF', name: 'Hungarian Forint' },
-  { code: 'RON', name: 'Romanian Leu' },
-  { code: 'BGN', name: 'Bulgarian Lev' },
-  { code: 'HRK', name: 'Croatian Kuna' },
-  { code: 'RSD', name: 'Serbian Dinar' },
-  { code: 'ISK', name: 'Icelandic Krona' },
-  { code: 'UAH', name: 'Ukrainian Hryvnia' },
-  { code: 'BYN', name: 'Belarusian Ruble' },
-  { code: 'BAM', name: 'Bosnia-Herzegovina Convertible Mark' },
-  { code: 'MKD', name: 'Macedonian Denar' },
-  { code: 'ALL', name: 'Albanian Lek' },
-  { code: 'MDL', name: 'Moldovan Leu' },
-  { code: 'GEL', name: 'Georgian Lari' },
-  { code: 'AMD', name: 'Armenian Dram' },
-  { code: 'AZN', name: 'Azerbaijani Manat' },
-  { code: 'KZT', name: 'Kazakhstani Tenge' },
-  { code: 'UZS', name: 'Uzbekistani Som' },
-  { code: 'KGS', name: 'Kyrgystani Som' },
-  { code: 'TJS', name: 'Tajikistani Somoni' },
-  { code: 'TMT', name: 'Turkmenistani Manat' },
-  { code: 'AFN', name: 'Afghan Afghani' },
-  { code: 'IRR', name: 'Iranian Rial' },
-  { code: 'IQD', name: 'Iraqi Dinar' },
-  { code: 'LBP', name: 'Lebanese Pound' },
-  { code: 'SYP', name: 'Syrian Pound' },
-  { code: 'YER', name: 'Yemeni Rial' },
-  { code: 'JMD', name: 'Jamaican Dollar' },
-  { code: 'BBD', name: 'Barbadian Dollar' },
-  { code: 'BZD', name: 'Belize Dollar' },
-  { code: 'BMD', name: 'Bermudan Dollar' },
-  { code: 'BSD', name: 'Bahamian Dollar' },
-  { code: 'XCD', name: 'East Caribbean Dollar' },
-  { code: 'AWG', name: 'Aruban Florin' },
-  { code: 'ANG', name: 'Netherlands Antillean Guilder' },
-  { code: 'COP', name: 'Colombian Peso' },
-  { code: 'PEN', name: 'Peruvian Nuevo Sol' },
-  { code: 'BOB', name: 'Bolivian Boliviano' },
-  { code: 'PYG', name: 'Paraguayan Guarani' },
-  { code: 'UYU', name: 'Uruguayan Peso' },
-  { code: 'VES', name: 'Venezuelan Bolivar' },
-  { code: 'GYD', name: 'Guyanaese Dollar' },
-  { code: 'SRD', name: 'Surinamese Dollar' },
-  { code: 'TTD', name: 'Trinidad and Tobago Dollar' },
-  { code: 'BND', name: 'Brunei Dollar' },
-  { code: 'FJD', name: 'Fijian Dollar' },
-  { code: 'PGK', name: 'Papua New Guinean Kina' },
-  { code: 'SBD', name: 'Solomon Islands Dollar' },
-  { code: 'VUV', name: 'Vanuatu Vatu' },
-  { code: 'WST', name: 'Samoan Tala' },
-  { code: 'TOP', name: 'Tongan Pa\'anga' },
-  { code: 'XPF', name: 'CFP Franc' },
-  { code: 'NZD', name: 'New Zealand Dollar' }
-].sort((a, b) => a.name.localeCompare(b.name));
-
-export function CreateJobPage() {
+export function EditJobPage() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   
+  const [jobData, setJobData] = useState<Job | null>(null);
+  const [loadingJob, setLoadingJob] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
 
-  const { createItem, creating } = useCRUD<Job>({
+  const { updateItem, updating } = useCRUD<Job>({
     resource: 'jobs',
     api: api.jobs,
     messages: {
-      created: 'Job created successfully',
+      updated: 'Job updated successfully',
     },
   });
 
@@ -193,13 +69,17 @@ export function CreateJobPage() {
     address: {
       city: '',
       state: '',
-      country: '',
+      country: 'USA',
       street: '',
     },
     jobType: 'full-time',
     experience: 'entry',
-    salary: undefined,
-    expiryDate: undefined,
+    salary: {
+      min: 0,
+      max: 0,
+      currency: 'USD',
+      period: 'annually',
+    },
     contactEmail: '',
     contactPhone: '',
     requirements: [],
@@ -214,9 +94,77 @@ export function CreateJobPage() {
   const [currentTag, setCurrentTag] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Fetch categories and providers
+  // Fetch job data and categories/providers
   useEffect(() => {
     const fetchData = async () => {
+      if (!id) {
+        toast({
+          title: 'Error',
+          description: 'Job ID is missing.',
+          variant: 'destructive',
+        });
+        navigate('/jobs');
+        return;
+      }
+
+      try {
+        setLoadingJob(true);
+        const jobResponse = await api.jobs.get(id);
+        if (jobResponse.success) {
+          const job = jobResponse.data;
+          setJobData(job);
+          
+          // Populate form with job data
+          setFormData({
+            title: job.title || '',
+            description: job.description || '',
+            providerId: typeof job.provider === 'object' && job.provider?.id 
+              ? job.provider.id 
+              : (job.providerId || ''),
+            category: typeof job.category === 'object' && job.category?.id
+              ? job.category.id
+              : (job.category || ''),
+            address: job.address || {
+              city: '',
+              state: '',
+              country: 'USA',
+              street: '',
+            },
+            jobType: (job.jobType || job.type || 'full-time') as 'full-time' | 'part-time' | 'contract' | 'freelance',
+            experience: job.experience || 'entry',
+            salary: job.salary || {
+              min: 0,
+              max: 0,
+              currency: 'USD',
+              period: 'annually',
+            },
+            contactEmail: job.contactEmail || '',
+            contactPhone: job.contactPhone || '',
+            requirements: job.requirements || [],
+            responsibilities: job.responsibilities || [],
+            benefits: job.benefits || [],
+            tags: job.tags || [],
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: jobResponse.message || 'Failed to fetch job details.',
+            variant: 'destructive',
+          });
+          navigate('/jobs');
+        }
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to fetch job details.',
+          variant: 'destructive',
+        });
+        navigate('/jobs');
+      } finally {
+        setLoadingJob(false);
+      }
+
+      // Fetch categories and providers
       try {
         setLoadingCategories(true);
         const categoriesResponse = await api.categories.list();
@@ -228,48 +176,28 @@ export function CreateJobPage() {
         }
       } catch (error: any) {
         console.error('Failed to fetch categories:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load categories',
-          variant: 'destructive',
-        });
       } finally {
         setLoadingCategories(false);
       }
 
       try {
         setLoadingProviders(true);
-        const providersResponse = await api.providers.list({ limit: 1000, status: 'approved' });
-        if (providersResponse && providersResponse.success !== false) {
-          // Handle both direct array and PaginatedResponse structure
-          let provs: Provider[] = [];
-          if (Array.isArray(providersResponse.data)) {
-            provs = providersResponse.data;
-          } else if (providersResponse.data && typeof providersResponse.data === 'object') {
-            if (Array.isArray(providersResponse.data.data)) {
-              provs = providersResponse.data.data;
-            } else if (Array.isArray(providersResponse.data)) {
-              provs = providersResponse.data;
-            }
-          }
+        const providersResponse = await api.providers.list({ limit: 100 });
+        if (providersResponse.success) {
+          const provs = Array.isArray(providersResponse.data)
+            ? providersResponse.data
+            : (providersResponse.data as any)?.data || [];
           setProviders(provs);
-        } else {
-          console.warn('Providers response not successful:', providersResponse);
         }
       } catch (error: any) {
         console.error('Failed to fetch providers:', error);
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to load providers',
-          variant: 'destructive',
-        });
       } finally {
         setLoadingProviders(false);
       }
     };
 
     fetchData();
-  }, [toast]);
+  }, [id, navigate, toast]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -330,33 +258,13 @@ export function CreateJobPage() {
     setFormData(prev => ({
       ...prev,
       salary: {
-        ...(prev.salary || { min: 0, max: 0, currency: 'USD', period: 'annually' }),
+        ...prev.salary,
         [field]: numValue,
       },
     }));
     if (errors[`salary${field.charAt(0).toUpperCase() + field.slice(1)}`]) {
       setErrors(prev => ({ ...prev, [`salary${field.charAt(0).toUpperCase() + field.slice(1)}`]: '' }));
     }
-  };
-
-  const handleSalaryCurrencyChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      salary: {
-        ...(prev.salary || { min: 0, max: 0, currency: 'USD', period: 'annually' }),
-        currency: value,
-      },
-    }));
-  };
-
-  const handleSalaryPeriodChange = (value: 'hourly' | 'daily' | 'monthly' | 'annually') => {
-    setFormData(prev => ({
-      ...prev,
-      salary: {
-        ...(prev.salary || { min: 0, max: 0, currency: 'USD', period: 'annually' }),
-        period: value,
-      },
-    }));
   };
 
   const handleAddItem = (type: 'requirement' | 'responsibility' | 'benefit' | 'tag') => {
@@ -426,13 +334,13 @@ export function CreateJobPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!validateForm() || !id) {
       return;
     }
 
     try {
       // Map form data to backend schema
-      const jobData: any = {
+      const updateData: any = {
         title: formData.title,
         description: formData.description,
         ...(formData.providerId && { providerId: formData.providerId }), // Only include if provided
@@ -444,11 +352,13 @@ export function CreateJobPage() {
           ...(formData.address.street && { street: formData.address.street }),
         },
         location: {
-          coordinates: [0, 0], // Default coordinates - can be enhanced with geocoding later
+          coordinates: (jobData?.location && typeof jobData.location === 'object' && 'coordinates' in jobData.location)
+            ? (jobData.location as any).coordinates
+            : [0, 0], // Keep existing coordinates or default
         },
         jobType: formData.jobType,
         experience: formData.experience,
-        // Only include salary if min and max are valid numbers > 0
+        // Only include salary if it has valid min/max values (> 0)
         ...(formData.salary && typeof formData.salary.min === 'number' && formData.salary.min > 0 && typeof formData.salary.max === 'number' && formData.salary.max > 0 && {
           salary: {
             min: formData.salary.min,
@@ -457,34 +367,49 @@ export function CreateJobPage() {
             period: formData.salary.period || 'annually',
           },
         }),
-        ...(formData.expiryDate && { expiryDate: formData.expiryDate.toISOString() }),
         contactEmail: formData.contactEmail,
         ...(formData.contactPhone && { contactPhone: formData.contactPhone }),
-        // Always send arrays, even if empty, to ensure proper handling
+        // Always send arrays, even if empty, to ensure proper updates
         requirements: formData.requirements || [],
         responsibilities: formData.responsibilities || [],
         benefits: formData.benefits || [],
         tags: formData.tags || [],
       };
 
-      const result = await createItem(jobData);
+      const result = await updateItem(id, updateData);
 
       if (result) {
         toast({
-          title: 'Job created successfully',
-          description: `${formData.title} has been created`,
+          title: 'Job updated successfully',
+          description: `${formData.title} has been updated`,
         });
         navigate('/jobs');
       }
     } catch (error: any) {
-      console.error('Error creating job:', error);
+      console.error('Error updating job:', error);
       toast({
-        title: 'Error creating job',
+        title: 'Error updating job',
         description: error.message || 'Please try again later',
         variant: 'destructive',
       });
     }
   };
+
+  if (loadingJob) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!jobData) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Job not found or could not be loaded.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -500,13 +425,13 @@ export function CreateJobPage() {
           Back to Jobs
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Post New Job</h1>
-          <p className="text-muted-foreground">Create a new job posting for marine professionals</p>
+          <h1 className="text-3xl font-bold">Edit Job</h1>
+          <p className="text-muted-foreground">Update job posting details</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
+        {/* Basic Information - Same as CreateJobPage */}
         <Card>
           <CardHeader>
             <CardTitle>Job Details</CardTitle>
@@ -532,7 +457,7 @@ export function CreateJobPage() {
                 <Label htmlFor="providerId">Provider (Optional)</Label>
                 <div className="flex gap-2">
                   <Select 
-                    value={formData.providerId || undefined} 
+                    value={formData.providerId || ''} 
                     onValueChange={(value) => handleInputChange('providerId', value)}
                     disabled={loadingProviders}
                   >
@@ -542,7 +467,7 @@ export function CreateJobPage() {
                     <SelectContent>
                       {providers.map((provider) => (
                         <SelectItem key={provider.id} value={provider.id}>
-                          {provider.companyName || provider.name || provider.id}
+                          {(provider as any).companyName || provider.name || provider.id}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -573,7 +498,7 @@ export function CreateJobPage() {
                     <SelectValue placeholder={loadingCategories ? "Loading..." : "Select category"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.filter(c => c.isActive !== false).map((category) => (
+                    {categories.filter(c => (c as any).isActive !== false && (c as any).active !== false).map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
                       </SelectItem>
@@ -679,21 +604,13 @@ export function CreateJobPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="country">Country *</Label>
-                <Select
+                <Input
+                  id="country"
+                  placeholder="e.g., USA"
                   value={formData.address.country}
-                  onValueChange={(value) => handleInputChange('address.country', value)}
-                >
-                  <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {COUNTRIES.map((country) => (
-                      <SelectItem key={country} value={country}>
-                        {country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => handleInputChange('address.country', e.target.value)}
+                  className={errors.country ? 'border-destructive' : ''}
+                />
                 {errors.country && <p className="text-sm text-destructive">{errors.country}</p>}
               </div>
             </div>
@@ -755,7 +672,7 @@ export function CreateJobPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="salary-min">Minimum Salary</Label>
+                <Label htmlFor="salary-min">Minimum Salary *</Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -771,7 +688,7 @@ export function CreateJobPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="salary-max">Maximum Salary</Label>
+                <Label htmlFor="salary-max">Maximum Salary *</Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -790,26 +707,33 @@ export function CreateJobPage() {
                 <Label htmlFor="currency">Currency</Label>
                 <Select
                   value={formData.salary?.currency || 'USD'}
-                  onValueChange={handleSalaryCurrencyChange}
+                  onValueChange={(value) => handleInputChange('salary.currency', value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {CURRENCIES.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code}>
-                        {currency.code} - {currency.name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent>
+                    <SelectItem value="USD">USD - US Dollar</SelectItem>
+                    <SelectItem value="EUR">EUR - Euro</SelectItem>
+                    <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                    <SelectItem value="INR">INR - Indian Rupee</SelectItem>
+                    <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                    <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                    <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                    <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
+                    <SelectItem value="SGD">SGD - Singapore Dollar</SelectItem>
+                    <SelectItem value="AED">AED - UAE Dirham</SelectItem>
+                    <SelectItem value="SAR">SAR - Saudi Riyal</SelectItem>
+                    <SelectItem value="ZAR">ZAR - South African Rand</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="period">Salary Period</Label>
+                <Label htmlFor="period">Period</Label>
                 <Select
                   value={formData.salary?.period || 'annually'}
-                  onValueChange={handleSalaryPeriodChange}
+                  onValueChange={(value: any) => handleInputChange('salary.period', value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -824,60 +748,6 @@ export function CreateJobPage() {
               </div>
             </div>
             {errors.salaryRange && <p className="text-sm text-destructive">{errors.salaryRange}</p>}
-          </CardContent>
-        </Card>
-
-        {/* Expiry Date */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Job Expiry</CardTitle>
-            <CardDescription>
-              Set when this job posting should expire (optional)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label htmlFor="expiryDate">Expiry Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !formData.expiryDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.expiryDate ? format(formData.expiryDate, "PPP") : "Select expiry date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={formData.expiryDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setFormData(prev => ({ ...prev, expiryDate: date }));
-                      }
-                    }}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              {formData.expiryDate && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFormData(prev => ({ ...prev, expiryDate: undefined }))}
-                  className="text-xs"
-                >
-                  Clear date
-                </Button>
-              )}
-            </div>
           </CardContent>
         </Card>
 
@@ -1035,15 +905,15 @@ export function CreateJobPage() {
 
         {/* Submit Buttons */}
         <div className="flex items-center gap-4">
-          <Button type="submit" disabled={creating} className="min-w-32">
-            {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Job
+          <Button type="submit" disabled={updating} className="min-w-32">
+            {updating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Update Job
           </Button>
           <Button
             type="button"
             variant="ghost"
             onClick={() => navigate('/jobs')}
-            disabled={creating}
+            disabled={updating}
           >
             Cancel
           </Button>
@@ -1053,4 +923,5 @@ export function CreateJobPage() {
   );
 }
 
-export default CreateJobPage;
+export default EditJobPage;
+

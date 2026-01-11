@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, FileText, Calendar, Tag, Star, Archive, Play } from 'lucide-react';
 
@@ -23,8 +23,6 @@ export function BlogsPage() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
   const [blogStats, setBlogStats] = useState({
     total: 0,
     published: 0,
@@ -32,6 +30,12 @@ export function BlogsPage() {
     archived: 0,
     featured: 0,
   });
+
+  // Memoize the API object to prevent recreation on every render
+  const blogApi = useMemo(() => ({
+    ...api.blogs,
+    list: api.blogs.listAdmin, // Use admin endpoint for full blog list
+  }), []);
 
   // Use CRUD hook for blog management
   const {
@@ -45,43 +49,20 @@ export function BlogsPage() {
     setFilters,
   } = useCRUD<Blog>({
     resource: 'blogs',
-    api: {
-      ...api.blogs,
-      list: api.blogs.listAdmin, // Use admin endpoint for full blog list
-    },
+    api: blogApi,
     messages: {
       updated: 'Blog updated successfully',
       deleted: 'Blog deleted successfully',
     },
   });
 
-  useEffect(() => {
-    fetchBlogData();
-  }, []);
-
-  const fetchBlogData = async () => {
-    try {
-      // Fetch blogs using admin endpoint
-      await fetchItems();
-      
-      // Fetch blog statistics
-      const statsResponse = await api.blogs.getStats();
-      if (statsResponse.success) {
-        setBlogStats(statsResponse.data);
-      }
-    } catch (error: any) {
-      console.error('Failed to fetch blog data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load blog data. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   // Apply filters when search or filter values change
   useEffect(() => {
-    const filters: any = {};
+    const filters: any = {
+      page: 1,
+      limit: 25,
+      sortOrder: 'desc',
+    };
     
     if (searchQuery.trim()) {
       filters.search = searchQuery.trim();
@@ -91,8 +72,26 @@ export function BlogsPage() {
       filters.status = statusFilter;
     }
     
-    setFilters(filters);
-  }, [searchQuery, statusFilter, setFilters]);
+    // Use fetchItems directly instead of setFilters to avoid infinite loop
+    // fetchItems is memoized and should be stable
+    fetchItems(filters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, statusFilter]); // Removed fetchItems from deps to prevent loop
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // Fetch blog statistics
+        const statsResponse = await api.blogs.getStats();
+        if (statsResponse.success) {
+          setBlogStats(statsResponse.data);
+        }
+      } catch (error: any) {
+        console.error('Failed to fetch blog stats:', error);
+      }
+    };
+    loadInitialData();
+  }, []);
 
   const handlePublish = async (blogId: string) => {
     try {
@@ -103,7 +102,29 @@ export function BlogsPage() {
           title: 'Blog published',
           description: 'Blog post is now live',
         });
-        await fetchBlogData(); // Refresh data
+        // Refresh data using fetchItems
+        const filters: any = {
+          page: 1,
+          limit: 25,
+          sortOrder: 'desc',
+        };
+        if (searchQuery.trim()) {
+          filters.search = searchQuery.trim();
+        }
+        if (statusFilter !== 'all') {
+          filters.status = statusFilter;
+        }
+        await fetchItems(filters);
+        
+        // Refresh stats after publishing
+        try {
+          const statsResponse = await api.blogs.getStats();
+          if (statsResponse.success) {
+            setBlogStats(statsResponse.data);
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch blog stats:', error);
+        }
       }
     } catch (error: any) {
       toast({
@@ -123,7 +144,29 @@ export function BlogsPage() {
           title: 'Blog archived',
           description: 'Blog post has been archived',
         });
-        await fetchBlogData(); // Refresh data
+        // Refresh data using fetchItems
+        const filters: any = {
+          page: 1,
+          limit: 25,
+          sortOrder: 'desc',
+        };
+        if (searchQuery.trim()) {
+          filters.search = searchQuery.trim();
+        }
+        if (statusFilter !== 'all') {
+          filters.status = statusFilter;
+        }
+        await fetchItems(filters);
+        
+        // Refresh stats after archiving
+        try {
+          const statsResponse = await api.blogs.getStats();
+          if (statsResponse.success) {
+            setBlogStats(statsResponse.data);
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch blog stats:', error);
+        }
       }
     } catch (error: any) {
       toast({
@@ -144,7 +187,29 @@ export function BlogsPage() {
           title: blog?.featured ? 'Removed from featured' : 'Added to featured',
           description: blog?.featured ? 'Blog is no longer featured' : 'Blog is now featured',
         });
-        await fetchBlogData(); // Refresh data
+        // Refresh data using fetchItems
+        const filters: any = {
+          page: 1,
+          limit: 25,
+          sortOrder: 'desc',
+        };
+        if (searchQuery.trim()) {
+          filters.search = searchQuery.trim();
+        }
+        if (statusFilter !== 'all') {
+          filters.status = statusFilter;
+        }
+        await fetchItems(filters);
+        
+        // Refresh stats after toggling featured
+        try {
+          const statsResponse = await api.blogs.getStats();
+          if (statsResponse.success) {
+            setBlogStats(statsResponse.data);
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch blog stats:', error);
+        }
       }
     } catch (error: any) {
       toast({
@@ -157,12 +222,33 @@ export function BlogsPage() {
 
   const handleDelete = async (blogId: string) => {
     await deleteItem(blogId);
-    await fetchBlogData(); // Refresh stats after deletion
+    // Refresh data and stats after deletion
+    const filters: any = {
+      page: 1,
+      limit: 25,
+      sortOrder: 'desc',
+    };
+    if (searchQuery.trim()) {
+      filters.search = searchQuery.trim();
+    }
+    if (statusFilter !== 'all') {
+      filters.status = statusFilter;
+    }
+    await fetchItems(filters);
+    
+    // Refresh stats
+    try {
+      const statsResponse = await api.blogs.getStats();
+      if (statsResponse.success) {
+        setBlogStats(statsResponse.data);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch blog stats:', error);
+    }
   };
 
   const handleViewDetails = (blog: Blog) => {
-    setSelectedBlog(blog);
-    setViewDetailsOpen(true);
+    navigate(`/blogs/${blog.id}`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -356,31 +442,33 @@ export function BlogsPage() {
                       <TableCell>
                         <div>
                           <div className="font-medium">{blog.author?.name || 'Unknown'}</div>
-                          <div className="text-sm text-muted-foreground">{formatReadTime(blog.readTime)}</div>
+                          <div className="text-sm text-muted-foreground">{formatReadTime(blog.readTime || 0)}</div>
                         </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(blog.status)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-xs">
-                          {blog.tags.slice(0, 2).map((tag) => (
+                          {(blog.tags || []).slice(0, 2).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-xs">
                               {tag}
                             </Badge>
                           ))}
-                          {blog.tags.length > 2 && (
+                          {(blog.tags || []).length > 2 && (
                             <Badge variant="outline" className="text-xs">
-                              +{blog.tags.length - 2}
+                              +{(blog.tags || []).length - 2}
                             </Badge>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-center">
-                          <span className="font-medium">{blog.views.toLocaleString()}</span>
+                          <span className="font-medium">{(blog.views || 0).toLocaleString()}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {blog.publishedAt ? formatDate(blog.publishedAt) : 'Not published'}
+                        {blog.status === 'published' 
+                          ? (blog.publishedAt ? formatDate(blog.publishedAt) : (blog.createdAt ? formatDate(blog.createdAt) : 'Published'))
+                          : 'Not published'}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -458,91 +546,6 @@ export function BlogsPage() {
         </CardContent>
       </Card>
 
-      {/* View Blog Details Dialog */}
-      <Dialog open={viewDetailsOpen} onOpenChange={setViewDetailsOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Blog Details</DialogTitle>
-            <DialogDescription>
-              Complete information about {selectedBlog?.title}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedBlog && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold mb-2">Blog Information</h4>
-                  <div className="space-y-2 text-sm">
-                    <div><span className="font-medium">Title:</span> {selectedBlog.title}</div>
-                    <div><span className="font-medium">Slug:</span> {selectedBlog.slug}</div>
-                    <div><span className="font-medium">Author:</span> {selectedBlog.author?.name || 'Unknown'}</div>
-                    <div><span className="font-medium">Status:</span> {getStatusBadge(selectedBlog.status)}</div>
-                    <div><span className="font-medium">Featured:</span> {selectedBlog.featured ? 'Yes' : 'No'}</div>
-                    <div><span className="font-medium">Read Time:</span> {formatReadTime(selectedBlog.readTime)}</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-semibold mb-2">Metrics & Dates</h4>
-                  <div className="space-y-2 text-sm">
-                    <div><span className="font-medium">Views:</span> {selectedBlog.views.toLocaleString()}</div>
-                    <div><span className="font-medium">Created:</span> {formatDate(selectedBlog.createdAt)}</div>
-                    <div><span className="font-medium">Updated:</span> {formatDate(selectedBlog.updatedAt)}</div>
-                    <div><span className="font-medium">Published:</span> {selectedBlog.publishedAt ? formatDate(selectedBlog.publishedAt) : 'Not published'}</div>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="font-semibold mb-2">Excerpt</h4>
-                <p className="text-sm text-muted-foreground">{selectedBlog.excerpt}</p>
-              </div>
-              
-              <div>
-                <h4 className="font-semibold mb-2">Tags</h4>
-                <div className="flex flex-wrap gap-2">
-                  {selectedBlog.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="gap-1">
-                      <Tag className="h-3 w-3" />
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {selectedBlog.seo && (
-                <div>
-                  <h4 className="font-semibold mb-2">SEO Information</h4>
-                  <div className="space-y-2 text-sm">
-                    <div><span className="font-medium">Meta Title:</span> {selectedBlog.seo.metaTitle || 'Not set'}</div>
-                    <div><span className="font-medium">Meta Description:</span> {selectedBlog.seo.metaDescription || 'Not set'}</div>
-                    <div>
-                      <span className="font-medium">Keywords:</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedBlog.seo.keywords.map((keyword) => (
-                          <Badge key={keyword} variant="outline" className="text-xs">
-                            {keyword}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDetailsOpen(false)}>
-              Close
-            </Button>
-            {selectedBlog && (
-              <Button onClick={() => navigate(`/blogs/${selectedBlog.id}/edit`)}>
-                Edit Blog
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -160,9 +160,19 @@ class ApiClient {
     return response.data;
   }
 
-  async getPaginated<T = any>(url: string, params?: any): Promise<PaginatedResponse<T>> {
+  async getPaginated<T = any>(url: string, params?: any): Promise<ApiResponse<PaginatedResponse<T>>> {
     const response = await this.instance.get(url, { params });
-    return response.data;
+    // Backend returns { success: true, data: { data: [...], pagination: {...} } }
+    // We need to ensure the response has the success field
+    const data = response.data;
+    if (data && typeof data === 'object' && 'success' in data) {
+      return data as ApiResponse<PaginatedResponse<T>>;
+    }
+    // If response doesn't have success field, wrap it
+    return {
+      success: true,
+      data: data as PaginatedResponse<T>,
+    };
   }
 
   // File upload
@@ -375,6 +385,10 @@ class ApiClient {
       return this.patch(`/jobs/${id}/close`);
     },
 
+    reopen: async (id: string) => {
+      return this.patch(`/jobs/${id}/reopen`);
+    },
+
     // GET /api/v1/jobs/:id/applications - Get all applications for a job (Admin/Provider)
     getApplications: async (jobId: string, params?: any) => {
       return this.getPaginated(`/jobs/${jobId}/applications`, params);
@@ -506,8 +520,8 @@ class ApiClient {
     },
 
     // PATCH /api/v1/approvals/:approvalId/approve - Approve a request
-    approve: async (id: string) => {
-      return this.patch(`/approvals/${id}/approve`);
+    approve: async (id: string, notes?: string) => {
+      return this.patch(`/approvals/${id}/approve`, notes ? { notes } : {});
     },
 
     // PATCH /api/v1/approvals/:approvalId/reject - Reject a request with reason

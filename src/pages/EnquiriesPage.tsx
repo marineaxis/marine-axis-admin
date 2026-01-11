@@ -23,9 +23,11 @@ interface Enquiry {
   email: string;
   subject: string;
   message: string;
-  providerId?: string;
-  status: 'pending' | 'resolved';
+  providerId?: string | { _id: string; companyName?: string; contactName?: string; email?: string };
+  status: 'pending' | 'resolved' | 'archived';
   notes?: string;
+  resolvedAt?: string;
+  resolvedBy?: string | { _id: string; name?: string; email?: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -115,8 +117,9 @@ export function EnquiriesPage() {
     },
   });
 
-  const enquiries = enquiriesData?.data || [];
-  const stats = statsData?.data || { total: 0, pending: 0, resolved: 0 };
+  // Extract enquiries from paginated response
+  const enquiries = enquiriesData?.data?.data || enquiriesData?.data || [];
+  const stats = statsData?.data || { total: 0, pending: 0, resolved: 0, archived: 0 };
 
   const handleViewDetails = (enquiry: Enquiry) => {
     setSelectedEnquiry(enquiry);
@@ -124,7 +127,7 @@ export function EnquiriesPage() {
     setViewDialogOpen(true);
   };
 
-  const handleUpdateStatus = (enquiry: Enquiry, status: 'pending' | 'resolved') => {
+  const handleUpdateStatus = (enquiry: Enquiry, status: 'pending' | 'resolved' | 'archived') => {
     setSelectedEnquiry(enquiry);
     setUpdateNotes(enquiry.notes || '');
     setUpdateDialogOpen(true);
@@ -132,9 +135,19 @@ export function EnquiriesPage() {
 
   const handleSubmitUpdate = () => {
     if (!selectedEnquiry) return;
+    // Toggle between pending and resolved, or set to archived
+    let newStatus: 'pending' | 'resolved' | 'archived';
+    if (selectedEnquiry.status === 'pending') {
+      newStatus = 'resolved';
+    } else if (selectedEnquiry.status === 'resolved') {
+      newStatus = 'pending';
+    } else {
+      newStatus = 'pending'; // If archived, set to pending
+    }
+    
     updateStatusMutation.mutate({
       id: selectedEnquiry.id,
-      status: selectedEnquiry.status === 'pending' ? 'resolved' : 'pending',
+      status: newStatus,
       notes: updateNotes.trim() || undefined,
     });
   };
@@ -149,6 +162,8 @@ export function EnquiriesPage() {
         return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" />Pending</Badge>;
       case 'resolved':
         return <Badge variant="default" className="gap-1"><CheckCircle className="h-3 w-3" />Resolved</Badge>;
+      case 'archived':
+        return <Badge variant="secondary" className="gap-1"><FileText className="h-3 w-3" />Archived</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -182,7 +197,7 @@ export function EnquiriesPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold">{stats.total || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -191,7 +206,7 @@ export function EnquiriesPage() {
             <Clock className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
+            <div className="text-2xl font-bold">{stats.pending || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -200,7 +215,16 @@ export function EnquiriesPage() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.resolved}</div>
+            <div className="text-2xl font-bold">{stats.resolved || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Archived</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.archived || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -232,6 +256,7 @@ export function EnquiriesPage() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
               </SelectContent>
             </Select>
             <div className="text-sm text-muted-foreground">
@@ -312,9 +337,29 @@ export function EnquiriesPage() {
                               </DropdownMenuItem>
                             )}
                             {enquiry.status === 'resolved' && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleUpdateStatus(enquiry, 'pending')}>
+                                  <Clock className="mr-2 h-4 w-4" />
+                                  Mark as Pending
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setSelectedEnquiry(enquiry);
+                                  setUpdateNotes(enquiry.notes || '');
+                                  updateStatusMutation.mutate({
+                                    id: enquiry.id,
+                                    status: 'archived',
+                                    notes: enquiry.notes || undefined,
+                                  });
+                                }}>
+                                  <FileText className="mr-2 h-4 w-4" />
+                                  Archive
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {enquiry.status === 'archived' && (
                               <DropdownMenuItem onClick={() => handleUpdateStatus(enquiry, 'pending')}>
                                 <Clock className="mr-2 h-4 w-4" />
-                                Mark as Pending
+                                Restore to Pending
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
@@ -392,6 +437,32 @@ export function EnquiriesPage() {
                   <Label>Date</Label>
                   <div className="text-sm text-muted-foreground">{formatDate(selectedEnquiry.createdAt)}</div>
                 </div>
+                {selectedEnquiry.providerId && (
+                  <div className="col-span-2">
+                    <Label>Provider</Label>
+                    <div className="text-sm font-medium">
+                      {typeof selectedEnquiry.providerId === 'object' 
+                        ? (selectedEnquiry.providerId.companyName || selectedEnquiry.providerId.contactName || 'N/A')
+                        : 'N/A'}
+                    </div>
+                  </div>
+                )}
+                {selectedEnquiry.resolvedAt && (
+                  <div>
+                    <Label>Resolved At</Label>
+                    <div className="text-sm text-muted-foreground">{formatDate(selectedEnquiry.resolvedAt)}</div>
+                  </div>
+                )}
+                {selectedEnquiry.resolvedBy && (
+                  <div>
+                    <Label>Resolved By</Label>
+                    <div className="text-sm font-medium">
+                      {typeof selectedEnquiry.resolvedBy === 'object'
+                        ? (selectedEnquiry.resolvedBy.name || selectedEnquiry.resolvedBy.email || 'N/A')
+                        : 'N/A'}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <Label>Message</Label>
@@ -448,7 +519,11 @@ export function EnquiriesPage() {
               onClick={handleSubmitUpdate}
               disabled={updateStatusMutation.isPending}
             >
-              {selectedEnquiry?.status === 'pending' ? 'Mark as Resolved' : 'Mark as Pending'}
+              {selectedEnquiry?.status === 'pending' 
+                ? 'Mark as Resolved' 
+                : selectedEnquiry?.status === 'resolved'
+                ? 'Mark as Pending'
+                : 'Restore to Pending'}
             </Button>
           </DialogFooter>
         </DialogContent>

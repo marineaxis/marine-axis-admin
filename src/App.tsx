@@ -29,6 +29,8 @@ import EditProviderPage from "./pages/EditProviderPage";
 // Jobs Pages
 import JobsPage from "./pages/JobsPage";
 import CreateJobPage from "./pages/CreateJobPage";
+import EditJobPage from "./pages/EditJobPage";
+import JobDetailPage from "./pages/JobDetailPage";
 
 // Categories Pages
 import CategoriesPage from "./pages/CategoriesPage";
@@ -38,6 +40,8 @@ import AdminsPage from "./pages/AdminsPage";
 import CreateAdminPage from "./pages/CreateAdminPage";
 import BlogsPage from "./pages/BlogsPage";
 import CreateBlogPage from "./pages/CreateBlogPage";
+import EditBlogPage from "./pages/EditBlogPage";
+import BlogDetailPage from "./pages/BlogDetailPage";
 
 // Provider Pages
 import ProviderDashboard from "./pages/provider/ProviderDashboard";
@@ -124,6 +128,8 @@ const App = () => (
                 {/* Job Management */}
                 <Route path="jobs" element={<JobsPage />} />
                 <Route path="jobs/create" element={<CreateJobPage />} />
+                <Route path="jobs/:id" element={<JobDetailPage />} />
+                <Route path="jobs/:id/edit" element={<EditJobPage />} />
                 
                 {/* Categories */}
                 <Route path="categories" element={<CategoriesPage />} />
@@ -131,6 +137,8 @@ const App = () => (
                 {/* Blogs */}
                 <Route path="blogs" element={<BlogsPage />} />
                 <Route path="blogs/create" element={<CreateBlogPage />} />
+                <Route path="blogs/:id" element={<BlogDetailPage />} />
+                <Route path="blogs/:id/edit" element={<EditBlogPage />} />
                 
                 {/* Approvals */}
                 <Route path="approvals" element={<ApprovalsPage />} />

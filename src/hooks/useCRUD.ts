@@ -100,10 +100,11 @@ export function useCRUD<T extends { id: string }>(
       const filters = params || { page: 1, limit: 25, sortOrder: 'desc' };
       const response = await api.list(filters);
       
-      if (response.success) {
+      if (response && response.success !== false) {
         // Handle both direct array and PaginatedResponse structure
-        const items = Array.isArray(response.data) ? response.data : (response.data?.data || []);
-        const pagination = response.pagination || response.data?.pagination || {
+        // Backend returns: { success: true, data: { data: [...], pagination: {...} } }
+        let items: T[] = [];
+        let pagination = {
           page: 1,
           limit: 25,
           total: 0,
@@ -111,14 +112,38 @@ export function useCRUD<T extends { id: string }>(
           hasNext: false,
           hasPrev: false,
         };
+
+        if (Array.isArray(response.data)) {
+          items = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+          // Check if response.data has a 'data' property (PaginatedResponse structure)
+          if (Array.isArray(response.data.data)) {
+            items = response.data.data;
+            pagination = response.data.pagination || response.pagination || pagination;
+          } else if (Array.isArray(response.data)) {
+            items = response.data;
+          }
+        }
+
+        // Also check for pagination at top level
+        if (response.pagination) {
+          pagination = response.pagination;
+        }
         
         updateState({
           items,
           pagination,
           filters,
         });
+      } else if (response && response.success === false) {
+        toast({
+          title: 'Fetch Error',
+          description: response.message || `Failed to fetch ${resource}`,
+          variant: 'destructive',
+        });
       }
     } catch (error: any) {
+      console.error(`Failed to fetch ${resource}:`, error);
       toast({
         title: 'Fetch Error',
         description: error.message || `Failed to fetch ${resource}`,

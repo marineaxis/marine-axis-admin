@@ -93,6 +93,19 @@ interface ProviderFormProps {
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
+// Common countries list (same as CreateJobPage)
+const COUNTRIES = [
+  'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Italy', 'Spain',
+  'Netherlands', 'Belgium', 'Switzerland', 'Austria', 'Sweden', 'Norway', 'Denmark', 'Finland',
+  'Poland', 'Portugal', 'Greece', 'Ireland', 'New Zealand', 'Japan', 'South Korea', 'Singapore',
+  'Malaysia', 'Thailand', 'Indonesia', 'Philippines', 'Vietnam', 'India', 'China', 'Hong Kong',
+  'United Arab Emirates', 'Saudi Arabia', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'South Africa',
+  'Egypt', 'Nigeria', 'Kenya', 'Brazil', 'Argentina', 'Chile', 'Mexico', 'Colombia', 'Peru',
+  'Turkey', 'Israel', 'Russia', 'Ukraine', 'Czech Republic', 'Hungary', 'Romania', 'Bulgaria',
+  'Croatia', 'Slovenia', 'Estonia', 'Latvia', 'Lithuania', 'Iceland', 'Luxembourg', 'Malta',
+  'Cyprus', 'Monaco', 'Liechtenstein', 'Andorra', 'San Marino', 'Vatican City'
+].sort();
+
 // Helper to normalize categories - handle both array of strings (IDs) and array of objects
 const normalizeCategoryIds = (categories: any): string[] => {
   if (!categories || !Array.isArray(categories)) return [];
@@ -174,7 +187,7 @@ export function ProviderForm({ initialData, mode, onSubmit, onCancel, loading = 
       street: initialData?.address?.street || '',
       city: initialData?.address?.city || '',
       state: initialData?.address?.state || '',
-      country: initialData?.address?.country || 'USA',
+      country: initialData?.address?.country || '',
     },
     services: initialData?.services || [],
     categoryIds: (() => {
@@ -268,7 +281,7 @@ export function ProviderForm({ initialData, mode, onSubmit, onCancel, loading = 
           street: initialData?.address?.street || prev.address?.street || '',
           city: initialData?.address?.city || prev.address?.city || '',
           state: initialData?.address?.state || prev.address?.state || '',
-          country: initialData?.address?.country || prev.address?.country || 'USA',
+          country: initialData?.address?.country || prev.address?.country || '',
         },
         coordinates: initialData?.location?.coordinates ? [initialData.location.coordinates[0], initialData.location.coordinates[1]] : prev.coordinates,
         services: initialData?.services || prev.services || [],
@@ -616,7 +629,7 @@ export function ProviderForm({ initialData, mode, onSubmit, onCancel, loading = 
         street: formData.address?.street?.trim() || '',
         city: formData.address?.city?.trim() || '',
         state: formData.address?.state?.trim() || '',
-        country: formData.address?.country || 'USA',
+        country: formData.address?.country?.trim() || '',
       },
       location: {
         type: 'Point',
@@ -816,12 +829,21 @@ export function ProviderForm({ initialData, mode, onSubmit, onCancel, loading = 
 
             <div className="space-y-2">
               <Label htmlFor="address.country">Country</Label>
-              <Input
-                id="address.country"
-                placeholder="Country"
-                value={formData.address?.country || 'USA'}
-                onChange={(e) => handleInputChange('address.country', e.target.value)}
-              />
+              <Select
+                value={formData.address?.country || ''}
+                onValueChange={(value) => handleInputChange('address.country', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {COUNTRIES.map((country) => (
+                    <SelectItem key={country} value={country}>
+                      {country}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>

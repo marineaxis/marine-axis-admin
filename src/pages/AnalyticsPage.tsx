@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Users, Briefcase, Building2, TrendingUp, TrendingDown, Eye, MousePointer, Clock, DollarSign, MapPin, Star } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,69 +7,49 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 
-// Mock analytics data
-const ANALYTICS_DATA = {
+// Default/fallback analytics data
+const DEFAULT_ANALYTICS_DATA = {
   overview: {
-    totalProviders: 247,
-    totalJobs: 89,
-    totalApplications: 1250,
-    totalUsers: 3421,
-    providersGrowth: 12.5,
-    jobsGrowth: -5.2,
-    applicationsGrowth: 23.1,
-    usersGrowth: 8.7
+    totalProviders: 0,
+    totalJobs: 0,
+    totalApplications: 0,
+    totalUsers: 0,
+    providersGrowth: 0,
+    jobsGrowth: 0,
+    applicationsGrowth: 0,
+    usersGrowth: 0
   },
   jobMetrics: {
-    activeJobs: 67,
-    expiringSoon: 12,
-    averageApplications: 14.2,
-    averageSalary: 75000,
-    topCategories: [
-      { name: 'Marine Equipment', jobs: 25, applications: 340 },
-      { name: 'Boat Maintenance', jobs: 18, applications: 256 },
-      { name: 'Electronics & Navigation', jobs: 15, applications: 198 },
-      { name: 'Repair Services', jobs: 12, applications: 167 },
-      { name: 'Marina Services', jobs: 8, applications: 89 }
-    ]
+    activeJobs: 0,
+    expiringSoon: 0,
+    averageApplications: 0,
+    averageSalary: 0,
+    topCategories: []
   },
   providerMetrics: {
-    pendingApprovals: 15,
-    featuredProviders: 23,
-    averageRating: 4.6,
-    topPerformers: [
-      { name: 'Marine Solutions Ltd', rating: 4.9, jobs: 12, applications: 156 },
-      { name: 'Ocean Tech Services', rating: 4.8, jobs: 8, applications: 98 },
-      { name: 'Coastal Marine Works', rating: 4.7, jobs: 6, applications: 87 },
-      { name: 'Pacific Marine', rating: 4.6, jobs: 9, applications: 112 },
-      { name: 'Atlantic Services', rating: 4.5, jobs: 5, applications: 67 }
-    ]
+    pendingApprovals: 0,
+    featuredProviders: 0,
+    averageRating: 0,
+    topPerformers: []
   },
   engagement: {
-    pageViews: 45623,
-    uniqueVisitors: 12456,
-    averageSessionTime: '4m 32s',
-    bounceRate: 23.4,
-    topPages: [
-      { page: '/jobs', views: 15420, engagement: '6m 21s' },
-      { page: '/providers', views: 12340, engagement: '4m 15s' },
-      { page: '/categories', views: 8765, engagement: '3m 42s' },
-      { page: '/jobs/marine-engineer', views: 6543, engagement: '7m 18s' },
-      { page: '/providers/marine-solutions', views: 4567, engagement: '5m 33s' }
-    ]
+    pageViews: 0,
+    uniqueVisitors: 0,
+    averageSessionTime: '0m 0s',
+    bounceRate: 0,
+    topPages: []
   },
-  regionData: [
-    { region: 'Florida', providers: 45, jobs: 23, percentage: 18.2 },
-    { region: 'California', providers: 38, jobs: 19, percentage: 15.4 },
-    { region: 'Texas', providers: 32, jobs: 16, percentage: 13.0 },
-    { region: 'New York', providers: 28, jobs: 12, percentage: 11.3 },
-    { region: 'Massachusetts', providers: 25, jobs: 9, percentage: 10.1 },
-    { region: 'Others', providers: 79, jobs: 10, percentage: 32.0 }
-  ]
+  regionData: []
 };
 
 export function AnalyticsPage() {
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState('30');
+  const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState(DEFAULT_ANALYTICS_DATA);
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
@@ -91,6 +71,81 @@ export function AnalyticsPage() {
   const getGrowthIcon = (growth: number) => {
     return growth >= 0 ? TrendingUp : TrendingDown;
   };
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [dateRange]);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch all analytics data in parallel
+      const [overviewRes, providersRes, jobsRes] = await Promise.all([
+        api.analytics.dashboard(),
+        api.analytics.providers(),
+        api.analytics.jobs(),
+      ]);
+
+      // Combine the data
+      const overview = overviewRes.success ? overviewRes.data : DEFAULT_ANALYTICS_DATA.overview;
+      const providerMetrics = providersRes.success ? providersRes.data : DEFAULT_ANALYTICS_DATA.providerMetrics;
+      const jobMetrics = jobsRes.success ? jobsRes.data : DEFAULT_ANALYTICS_DATA.jobMetrics;
+
+      setAnalyticsData({
+        overview: {
+          totalProviders: overview.totalProviders ?? 0,
+          totalJobs: overview.totalJobs ?? 0,
+          totalApplications: overview.totalApplications ?? 0,
+          totalUsers: overview.totalUsers ?? 0,
+          providersGrowth: overview.providersGrowth ?? 0,
+          jobsGrowth: overview.jobsGrowth ?? 0,
+          applicationsGrowth: overview.applicationsGrowth ?? 0,
+          usersGrowth: overview.usersGrowth ?? 0,
+        },
+        jobMetrics: {
+          activeJobs: jobMetrics.activeJobs ?? 0,
+          expiringSoon: jobMetrics.expiringSoon ?? 0,
+          averageApplications: jobMetrics.averageApplications ?? 0,
+          averageSalary: jobMetrics.averageSalary ?? 0,
+          topCategories: jobMetrics.topCategories ?? [],
+        },
+        providerMetrics: {
+          pendingApprovals: providerMetrics.pendingApprovals ?? 0,
+          featuredProviders: providerMetrics.featuredProviders ?? 0,
+          averageRating: providerMetrics.averageRating ?? 0,
+          topPerformers: providerMetrics.topPerformers ?? [],
+        },
+        engagement: DEFAULT_ANALYTICS_DATA.engagement, // Not available in API yet
+        regionData: DEFAULT_ANALYTICS_DATA.regionData, // Not available in API yet
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch analytics data:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to load analytics data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+            <p className="text-muted-foreground">Comprehensive insights into platform performance</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -127,11 +182,13 @@ export function AnalyticsPage() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalProviders)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.providersGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.providersGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.providersGrowth)}% from last month
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalProviders)}</div>
+            {analyticsData.overview.providersGrowth !== 0 && (
+              <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.providersGrowth)}`}>
+                {React.createElement(getGrowthIcon(analyticsData.overview.providersGrowth), { className: "h-3 w-3" })}
+                {Math.abs(analyticsData.overview.providersGrowth)}% from last month
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -141,11 +198,13 @@ export function AnalyticsPage() {
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalJobs)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.jobsGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.jobsGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.jobsGrowth)}% from last month
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalJobs)}</div>
+            {analyticsData.overview.jobsGrowth !== 0 && (
+              <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.jobsGrowth)}`}>
+                {React.createElement(getGrowthIcon(analyticsData.overview.jobsGrowth), { className: "h-3 w-3" })}
+                {Math.abs(analyticsData.overview.jobsGrowth)}% from last month
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -155,11 +214,13 @@ export function AnalyticsPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalApplications)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.applicationsGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.applicationsGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.applicationsGrowth)}% from last month
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalApplications)}</div>
+            {analyticsData.overview.applicationsGrowth !== 0 && (
+              <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.applicationsGrowth)}`}>
+                {React.createElement(getGrowthIcon(analyticsData.overview.applicationsGrowth), { className: "h-3 w-3" })}
+                {Math.abs(analyticsData.overview.applicationsGrowth)}% from last month
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -169,11 +230,13 @@ export function AnalyticsPage() {
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.overview.totalUsers)}</div>
-            <div className={`text-xs flex items-center gap-1 ${getGrowthColor(ANALYTICS_DATA.overview.usersGrowth)}`}>
-              {React.createElement(getGrowthIcon(ANALYTICS_DATA.overview.usersGrowth), { className: "h-3 w-3" })}
-              {Math.abs(ANALYTICS_DATA.overview.usersGrowth)}% from last month
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(analyticsData.overview.totalUsers)}</div>
+            {analyticsData.overview.usersGrowth !== 0 && (
+              <div className={`text-xs flex items-center gap-1 ${getGrowthColor(analyticsData.overview.usersGrowth)}`}>
+                {React.createElement(getGrowthIcon(analyticsData.overview.usersGrowth), { className: "h-3 w-3" })}
+                {Math.abs(analyticsData.overview.usersGrowth)}% from last month
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -194,7 +257,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{ANALYTICS_DATA.jobMetrics.activeJobs}</div>
+                <div className="text-2xl font-bold text-green-600">{analyticsData.jobMetrics.activeJobs}</div>
                 <p className="text-xs text-muted-foreground">Currently accepting applications</p>
               </CardContent>
             </Card>
@@ -204,7 +267,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{ANALYTICS_DATA.jobMetrics.expiringSoon}</div>
+                <div className="text-2xl font-bold text-orange-600">{analyticsData.jobMetrics.expiringSoon}</div>
                 <p className="text-xs text-muted-foreground">Expiring within 7 days</p>
               </CardContent>
             </Card>
@@ -214,7 +277,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Avg Applications</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{ANALYTICS_DATA.jobMetrics.averageApplications}</div>
+                <div className="text-2xl font-bold">{analyticsData.jobMetrics.averageApplications.toFixed(1)}</div>
                 <p className="text-xs text-muted-foreground">Per job posting</p>
               </CardContent>
             </Card>
@@ -224,7 +287,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Average Salary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(ANALYTICS_DATA.jobMetrics.averageSalary)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(analyticsData.jobMetrics.averageSalary)}</div>
                 <p className="text-xs text-muted-foreground">Across all positions</p>
               </CardContent>
             </Card>
@@ -236,8 +299,9 @@ export function AnalyticsPage() {
               <CardDescription>Most popular categories by jobs posted and applications received</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {ANALYTICS_DATA.jobMetrics.topCategories.map((category, index) => (
+              {analyticsData.jobMetrics.topCategories.length > 0 ? (
+                <div className="space-y-4">
+                  {analyticsData.jobMetrics.topCategories.map((category: any, index: number) => (
                   <div key={category.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-medium">#{index + 1}</div>
@@ -251,8 +315,11 @@ export function AnalyticsPage() {
                       <div className="text-sm text-muted-foreground">applications</div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">No category data available</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -264,7 +331,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{ANALYTICS_DATA.providerMetrics.pendingApprovals}</div>
+                <div className="text-2xl font-bold text-orange-600">{analyticsData.providerMetrics.pendingApprovals}</div>
                 <p className="text-xs text-muted-foreground">Awaiting review</p>
               </CardContent>
             </Card>
@@ -274,7 +341,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Featured Providers</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{ANALYTICS_DATA.providerMetrics.featuredProviders}</div>
+                <div className="text-2xl font-bold text-blue-600">{analyticsData.providerMetrics.featuredProviders}</div>
                 <p className="text-xs text-muted-foreground">Currently featured</p>
               </CardContent>
             </Card>
@@ -286,7 +353,7 @@ export function AnalyticsPage() {
               <CardContent>
                 <div className="text-2xl font-bold flex items-center gap-1">
                   <Star className="h-5 w-5 text-yellow-500 fill-current" />
-                  {ANALYTICS_DATA.providerMetrics.averageRating}
+                  {analyticsData.providerMetrics.averageRating.toFixed(1)}
                 </div>
                 <p className="text-xs text-muted-foreground">Platform average</p>
               </CardContent>
@@ -299,13 +366,14 @@ export function AnalyticsPage() {
               <CardDescription>Highest rated providers with most job postings</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {ANALYTICS_DATA.providerMetrics.topPerformers.map((provider, index) => (
-                  <div key={provider.name} className="flex items-center justify-between">
+              {analyticsData.providerMetrics.topPerformers.length > 0 ? (
+                <div className="space-y-4">
+                  {analyticsData.providerMetrics.topPerformers.map((provider: any, index: number) => (
+                  <div key={provider.name || provider.id || index} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-medium">#{index + 1}</div>
                       <div>
-                        <div className="font-medium">{provider.name}</div>
+                        <div className="font-medium">{provider.name || provider.companyName || provider.contactName || 'Unknown'}</div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Star className="h-3 w-3 text-yellow-500 fill-current" />
                           {provider.rating} • {provider.jobs} jobs
@@ -317,8 +385,11 @@ export function AnalyticsPage() {
                       <div className="text-sm text-muted-foreground">applications</div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">No provider performance data available</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -330,7 +401,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Page Views</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.engagement.pageViews)}</div>
+                <div className="text-2xl font-bold">{formatNumber(analyticsData.engagement.pageViews)}</div>
                 <p className="text-xs text-muted-foreground">Total views this month</p>
               </CardContent>
             </Card>
@@ -340,7 +411,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Unique Visitors</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(ANALYTICS_DATA.engagement.uniqueVisitors)}</div>
+                <div className="text-2xl font-bold">{formatNumber(analyticsData.engagement.uniqueVisitors)}</div>
                 <p className="text-xs text-muted-foreground">Individual users</p>
               </CardContent>
             </Card>
@@ -350,7 +421,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Session Time</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{ANALYTICS_DATA.engagement.averageSessionTime}</div>
+                <div className="text-2xl font-bold">{analyticsData.engagement.averageSessionTime}</div>
                 <p className="text-xs text-muted-foreground">Average duration</p>
               </CardContent>
             </Card>
@@ -360,7 +431,7 @@ export function AnalyticsPage() {
                 <CardTitle className="text-sm font-medium">Bounce Rate</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{ANALYTICS_DATA.engagement.bounceRate}%</div>
+                <div className="text-2xl font-bold">{analyticsData.engagement.bounceRate}%</div>
                 <p className="text-xs text-muted-foreground">Single page visits</p>
               </CardContent>
             </Card>
@@ -372,8 +443,9 @@ export function AnalyticsPage() {
               <CardDescription>Top performing pages by traffic and engagement</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {ANALYTICS_DATA.engagement.topPages.map((page, index) => (
+              {analyticsData.engagement.topPages.length > 0 ? (
+                <div className="space-y-4">
+                  {analyticsData.engagement.topPages.map((page: any, index: number) => (
                   <div key={page.page} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-medium">#{index + 1}</div>
@@ -387,8 +459,11 @@ export function AnalyticsPage() {
                       <div className="text-sm text-muted-foreground">views</div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">Engagement data not available</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -400,8 +475,9 @@ export function AnalyticsPage() {
               <CardDescription>Provider and job distribution by region</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                {ANALYTICS_DATA.regionData.map((region) => (
+              {analyticsData.regionData.length > 0 ? (
+                <div className="space-y-6">
+                  {analyticsData.regionData.map((region: any) => (
                   <div key={region.region} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -417,8 +493,11 @@ export function AnalyticsPage() {
                       <span className="text-sm font-medium">{region.percentage}%</span>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">Geographic data not available</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
