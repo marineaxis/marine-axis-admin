@@ -662,6 +662,32 @@ class ApiClient {
     },
   };
 
+  // Customer management - Superadmin only
+  // GET /api/v1/customers - Get all customers with filters and pagination
+  // Query params: page, limit, isActive, search
+  customers = {
+    // GET /api/v1/customers - List all customers with pagination and filters (Superadmin only)
+    list: async (params?: any) => {
+      return this.getPaginated('/customers', params);
+    },
+
+    // GET /api/v1/customers/:id - Get single customer by ID (Superadmin only)
+    get: async (id: string) => {
+      return this.get(`/customers/${id}`);
+    },
+
+    // PUT /api/v1/customers/:id - Update customer (Superadmin only)
+    // Body: { name?, isActive?, planKey? }
+    update: async (id: string, data: any) => {
+      return this.put(`/customers/${id}`, data);
+    },
+
+    // GET /api/v1/customers/stats - Get customer statistics (Superadmin only)
+    getStats: async () => {
+      return this.get('/customers/stats');
+    },
+  };
+
   // Newsletter management
   // POST /api/v1/newsletter/subscribe - Subscribe (Public)
   // POST /api/v1/newsletter/unsubscribe - Unsubscribe (Public)

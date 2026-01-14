@@ -38,6 +38,7 @@ import CategoriesPage from "./pages/CategoriesPage";
 // Other placeholder pages
 import AdminsPage from "./pages/AdminsPage";
 import CreateAdminPage from "./pages/CreateAdminPage";
+import CustomersPage from "./pages/CustomersPage";
 import BlogsPage from "./pages/BlogsPage";
 import CreateBlogPage from "./pages/CreateBlogPage";
 import EditBlogPage from "./pages/EditBlogPage";
@@ -61,6 +62,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
 import EnquiriesPage from "./pages/EnquiriesPage";
+import NewsletterPage from "./pages/NewsletterPage";
 import BookingsPage from "./pages/BookingsPage";
 import BookingDetailPage from "./pages/BookingDetailPage";
 import CreateBookingPage from "./pages/CreateBookingPage";
@@ -120,6 +122,16 @@ const App = () => (
                   }
                 />
                 
+                {/* Customer Management */}
+                <Route
+                  path="customers"
+                  element={
+                    <ProtectedRoute roles={['superadmin']}>
+                      <CustomersPage />
+                    </ProtectedRoute>
+                  }
+                />
+                
                 {/* Provider Management */}
                 <Route path="providers" element={<ProvidersPage />} />
                 <Route path="providers/create" element={<CreateProviderPage />} />
@@ -145,6 +157,9 @@ const App = () => (
                 
                 {/* Enquiries */}
                 <Route path="enquiries" element={<EnquiriesPage />} />
+                
+                {/* Newsletter */}
+                <Route path="newsletter" element={<NewsletterPage />} />
                 
                 {/* Bookings */}
                 <Route path="bookings" element={<BookingsPage />} />

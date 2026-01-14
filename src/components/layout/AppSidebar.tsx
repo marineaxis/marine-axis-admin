@@ -22,6 +22,7 @@ import {
   Ship,
   FolderKanban,
   Share2,
+  UserCircle,
 } from 'lucide-react';
 
 import {
@@ -68,6 +69,12 @@ const navigationItems = [
         icon: User,
       },
     ],
+  },
+  {
+    title: 'Customers',
+    url: ROUTES.CUSTOMERS,
+    icon: UserCircle,
+    roles: ['superadmin'],
   },
   {
     title: 'Provider Management',
@@ -136,6 +143,12 @@ const navigationItems = [
     title: 'Enquiries',
     url: ROUTES.ENQUIRIES,
     icon: MessageSquare,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Newsletter',
+    url: ROUTES.NEWSLETTER,
+    icon: Mail,
     roles: ['superadmin', 'admin'],
   },
   {
@@ -212,7 +225,7 @@ const navigationItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { canAccess, hasRole } = useAuth();
+  const { canAccess, hasRole, isLoading: authLoading, user } = useAuth();
   const location = useLocation();
 
   const isActive = (path: string) => {
@@ -233,9 +246,21 @@ export function AppSidebar() {
   };
 
   const filterNavigationByRole = (items: typeof navigationItems) => {
+    // Don't filter if auth is still loading
+    if (authLoading) {
+      return [];
+    }
+    
     return items.filter(item => {
       if (item.roles) {
-        return item.roles.some(role => hasRole(role as any));
+        // Check if user has any of the required roles
+        const hasAccess = item.roles.some(role => {
+          // Direct check from user object first (most reliable)
+          if (user?.role === role) return true;
+          // Fallback to hasRole function
+          return hasRole(role as any);
+        });
+        return hasAccess;
       }
       return true;
     });

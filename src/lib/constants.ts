@@ -38,6 +38,9 @@ export const ROUTES = {
   ADMIN_CREATE: '/admins/create',
   ADMIN_EDIT: '/admins/:id/edit',
   
+  // Customer Management
+  CUSTOMERS: '/customers',
+  
   // Provider Management
   PROVIDERS: '/providers',
   PROVIDER_CREATE: '/providers/create',
@@ -86,6 +89,9 @@ export const ROUTES = {
   
   // Enquiries
   ENQUIRIES: '/enquiries',
+  
+  // Newsletter
+  NEWSLETTER: '/newsletter',
   
   // Bookings
   BOOKINGS: '/bookings',

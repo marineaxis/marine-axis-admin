@@ -67,23 +67,45 @@ export class AuthManager {
   }
 
   static getUserRole(): Role | null {
+    // First try to get role from user data
+    const userData = this.getUserData();
+    if (userData?.role) {
+      return userData.role as Role;
+    }
+    // Fallback to JWT token
     const token = this.getDecodedToken();
     return token?.role || null;
   }
 
   static hasRole(requiredRole: 'superadmin' | 'admin'): boolean {
-    const userRole = this.getUserRole();
+    // First check JWT token
+    const tokenRole = this.getUserRole();
+    
+    // Also check user data from localStorage as fallback
+    const userData = this.getUserData();
+    const userRole = tokenRole || userData?.role;
+    
     if (!userRole) return false;
 
+    // Normalize role to lowercase for comparison
+    const normalizedRole = String(userRole).toLowerCase();
+    const normalizedRequired = String(requiredRole).toLowerCase();
+
     // Super admin has access to everything
-    if (userRole === 'superadmin') return true;
+    if (normalizedRole === 'superadmin') return true;
     
     // Admin can only access admin-level features
-    return userRole === requiredRole;
+    return normalizedRole === normalizedRequired;
   }
 
   static canAccess(requiredRoles: ('superadmin' | 'admin')[]): boolean {
-    const userRole = this.getUserRole();
+    // First check JWT token
+    const tokenRole = this.getUserRole();
+    
+    // Also check user data from localStorage as fallback
+    const userData = this.getUserData();
+    const userRole = tokenRole || userData?.role;
+    
     if (!userRole) return false;
 
     // Super admin has access to everything
