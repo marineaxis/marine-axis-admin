@@ -13,23 +13,46 @@ import { useToast } from '@/hooks/use-toast';
 import { useProviderAuth } from '../../context/ProviderAuthContext';
 
 export function ProviderProfilePage() {
-  const { provider, updateProfile } = useProviderAuth();
+  const { provider, updateProfile, refreshProvider } = useProviderAuth();
   const { toast } = useToast();
   
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: provider?.name || '',
-    email: provider?.email || '',
-    phone: provider?.phone || '',
-    location: provider?.location || '',
-    description: provider?.description || '',
-    website: provider?.website || '',
-    socialLinks: {
-      linkedin: provider?.socialLinks?.linkedin || '',
-      facebook: provider?.socialLinks?.facebook || '',
-      twitter: provider?.socialLinks?.twitter || '',
-    },
-  });
+  
+  // Initialize form data from provider, with proper defaults
+  const getInitialFormData = () => {
+    const socialLinks = provider?.socialLinks || {};
+    // Handle socialMedia array format from backend
+    const socialMediaArray = (provider as any)?.socialMedia || [];
+    const socialLinksFromArray = socialMediaArray.reduce((acc: any, item: any) => {
+      if (item.key && item.url) {
+        acc[item.key] = item.url;
+      }
+      return acc;
+    }, {});
+    
+    return {
+      name: provider?.name || provider?.companyName || '',
+      email: provider?.email || '',
+      phone: provider?.phone || '',
+      location: provider?.location || '',
+      description: provider?.description || '',
+      website: provider?.website || '',
+      socialLinks: {
+        linkedin: socialLinks.linkedin || socialLinksFromArray.linkedin || '',
+        facebook: socialLinks.facebook || socialLinksFromArray.facebook || '',
+        twitter: socialLinks.twitter || socialLinksFromArray.twitter || '',
+      },
+    };
+  };
+  
+  const [formData, setFormData] = useState(getInitialFormData());
+  
+  // Update form data when provider changes
+  React.useEffect(() => {
+    if (provider) {
+      setFormData(getInitialFormData());
+    }
+  }, [provider]);
 
   const handleInputChange = (field: string, value: string) => {
     if (field.startsWith('socialLinks.')) {
@@ -48,7 +71,11 @@ export function ProviderProfilePage() {
     setIsLoading(true);
 
     try {
-      await updateProfile(formData);
+      const success = await updateProfile(formData);
+      if (success) {
+        // Refresh provider data to get latest from server
+        await refreshProvider();
+      }
     } catch (error) {
       toast({
         title: 'Error',

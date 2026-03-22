@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Send, Copy, Download } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,168 +15,31 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import api from '../lib/api';
 
 interface EmailTemplate {
   id: string;
   name: string;
+  type: string;
   subject: string;
-  category: 'provider' | 'job' | 'user' | 'system';
-  content: string;
+  category: 'provider' | 'customer' | 'admin' | 'system' | 'job' | 'booking' | 'contract';
+  bodyHtml: string;
+  bodyText?: string;
   variables: string[];
   isActive: boolean;
-  lastUsed?: string;
+  description?: string;
+  lastUsedAt?: string;
   useCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
-// Mock email templates data
-const MOCK_TEMPLATES: EmailTemplate[] = [
-  {
-    id: '1',
-    name: 'Provider Welcome',
-    subject: 'Welcome to Marine-Axis!',
-    category: 'provider',
-    content: `Dear {{providerName}},
-
-Welcome to Marine-Axis! We're excited to have you join our platform.
-
-Your account has been successfully created and is now under review. Our team will review your application within 2-3 business days.
-
-Here's what happens next:
-• Account verification and approval
-• Access to your provider dashboard
-• Ability to post job listings
-• Connect with marine professionals
-
-If you have any questions, please don't hesitate to contact our support team.
-
-Best regards,
-The Marine-Axis Team`,
-    variables: ['providerName', 'supportEmail'],
-    isActive: true,
-    lastUsed: '2024-01-25T10:30:00Z',
-    useCount: 156,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-20T00:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Provider Approval',
-    subject: 'Your account has been approved!',
-    category: 'provider',
-    content: `Dear {{providerName}},
-
-Great news! Your Marine-Axis provider account has been approved.
-
-You can now:
-• Access your full provider dashboard
-• Post unlimited job listings
-• Manage your company profile
-• Connect with qualified candidates
-
-Login to your dashboard: {{dashboardUrl}}
-
-Welcome aboard!
-
-Best regards,
-The Marine-Axis Team`,
-    variables: ['providerName', 'dashboardUrl'],
-    isActive: true,
-    lastUsed: '2024-01-24T14:20:00Z',
-    useCount: 89,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-  {
-    id: '3',
-    name: 'Job Application Received',
-    subject: 'New application for {{jobTitle}}',
-    category: 'job',
-    content: `Hello {{providerName}},
-
-You've received a new application for your job posting: {{jobTitle}}
-
-Candidate Details:
-• Name: {{candidateName}}
-• Email: {{candidateEmail}}
-• Application Date: {{applicationDate}}
-
-To review the application and candidate profile, please visit your dashboard.
-
-Review Application: {{applicationUrl}}
-
-Best regards,
-The Marine-Axis Team`,
-    variables: ['providerName', 'jobTitle', 'candidateName', 'candidateEmail', 'applicationDate', 'applicationUrl'],
-    isActive: true,
-    lastUsed: '2024-01-25T16:45:00Z',
-    useCount: 342,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-22T00:00:00Z',
-  },
-  {
-    id: '4',
-    name: 'Password Reset',
-    subject: 'Reset your Marine-Axis password',
-    category: 'user',
-    content: `Hello {{userName}},
-
-We received a request to reset your Marine-Axis password.
-
-Click the link below to reset your password:
-{{resetUrl}}
-
-This link will expire in 1 hour.
-
-If you didn't request this password reset, please ignore this email.
-
-Best regards,
-The Marine-Axis Team`,
-    variables: ['userName', 'resetUrl'],
-    isActive: true,
-    lastUsed: '2024-01-25T09:15:00Z',
-    useCount: 67,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-10T00:00:00Z',
-  },
-  {
-    id: '5',
-    name: 'System Maintenance',
-    subject: 'Scheduled maintenance notification',
-    category: 'system',
-    content: `Dear Marine-Axis Users,
-
-We will be performing scheduled maintenance on our platform:
-
-Date: {{maintenanceDate}}
-Time: {{maintenanceTime}}
-Duration: {{maintenanceDuration}}
-
-During this time, the platform may be temporarily unavailable. We apologize for any inconvenience.
-
-If you have any urgent matters, please contact our support team.
-
-Thank you for your understanding.
-
-Best regards,
-The Marine-Axis Team`,
-    variables: ['maintenanceDate', 'maintenanceTime', 'maintenanceDuration'],
-    isActive: false,
-    lastUsed: '2024-01-20T00:00:00Z',
-    useCount: 12,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-20T00:00:00Z',
-  },
-];
-
 export function EmailTemplatesPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  const [templates, setTemplates] = useState<EmailTemplate[]>(MOCK_TEMPLATES);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -183,25 +47,31 @@ export function EmailTemplatesPage() {
   
   const [editForm, setEditForm] = useState({
     name: '',
+    type: '',
     subject: '',
     category: 'provider' as EmailTemplate['category'],
-    content: '',
+    bodyHtml: '',
+    bodyText: '',
     variables: [] as string[],
-    isActive: true
+    isActive: true,
+    description: ''
   });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
-  // Filter templates
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = 
-      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.content.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesCategory = categoryFilter === 'all' || template.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
+  // Fetch templates
+  const { data: templatesData, isLoading } = useQuery({
+    queryKey: ['email-templates', categoryFilter, searchQuery],
+    queryFn: async () => {
+      const params: any = { page: 1, limit: 100 };
+      if (categoryFilter !== 'all') params.category = categoryFilter;
+      if (searchQuery) params.search = searchQuery;
+      const response = await api.emailTemplates.list(params);
+      return response;
+    },
   });
+
+  const templates = templatesData?.data?.data || [];
+  const filteredTemplates = templates;
 
   const handleViewTemplate = (template: EmailTemplate) => {
     setSelectedTemplate(template);
@@ -212,11 +82,14 @@ export function EmailTemplatesPage() {
     setSelectedTemplate(template);
     setEditForm({
       name: template.name,
+      type: template.type,
       subject: template.subject,
       category: template.category,
-      content: template.content,
+      bodyHtml: template.bodyHtml,
+      bodyText: template.bodyText || '',
       variables: template.variables,
-      isActive: template.isActive
+      isActive: template.isActive,
+      description: template.description || ''
     });
     setEditErrors({});
     setEditDialogOpen(true);
@@ -225,11 +98,14 @@ export function EmailTemplatesPage() {
   const handleCreateTemplate = () => {
     setEditForm({
       name: '',
+      type: '',
       subject: '',
       category: 'provider',
-      content: '',
+      bodyHtml: '',
+      bodyText: '',
       variables: [],
-      isActive: true
+      isActive: true,
+      description: ''
     });
     setEditErrors({});
     setCreateDialogOpen(true);
@@ -239,150 +115,121 @@ export function EmailTemplatesPage() {
     const newErrors: Record<string, string> = {};
     
     if (!editForm.name.trim()) newErrors.name = 'Template name is required';
+    if (!editForm.type.trim()) newErrors.type = 'Template type is required';
     if (!editForm.subject.trim()) newErrors.subject = 'Subject is required';
-    if (!editForm.content.trim()) newErrors.content = 'Content is required';
+    if (!editForm.bodyHtml.trim()) newErrors.bodyHtml = 'HTML content is required';
     
     setEditErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSaveTemplate = async () => {
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
       if (selectedTemplate) {
-        // Update existing template
-        setTemplates(prev => prev.map(template => 
-          template.id === selectedTemplate.id 
-            ? { 
-                ...template, 
-                ...editForm,
-                updatedAt: new Date().toISOString() 
-              }
-            : template
-        ));
-        
-        toast({
-          title: 'Template updated',
-          description: `${editForm.name} has been updated successfully`,
-        });
-        
-        setEditDialogOpen(false);
+        return await api.emailTemplates.update(selectedTemplate.id, data);
       } else {
-        // Create new template
-        const newTemplate: EmailTemplate = {
-          id: String(templates.length + 1),
-          ...editForm,
-          useCount: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        
-        setTemplates(prev => [...prev, newTemplate]);
-        
-        toast({
-          title: 'Template created',
-          description: `${editForm.name} has been created successfully`,
-        });
-        
-        setCreateDialogOpen(false);
+        return await api.emailTemplates.create(data);
       }
-      
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
+      toast({
+        title: selectedTemplate ? 'Template updated' : 'Template created',
+        description: `${editForm.name} has been ${selectedTemplate ? 'updated' : 'created'} successfully`,
+      });
+      setEditDialogOpen(false);
+      setCreateDialogOpen(false);
       setSelectedTemplate(null);
-    } catch (error) {
+    },
+    onError: (error: any) => {
       toast({
         title: 'Error',
-        description: 'Failed to save template. Please try again.',
+        description: error.message || 'Failed to save template. Please try again.',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+  });
+
+  const handleSaveTemplate = async () => {
+    if (!validateForm()) return;
+    saveMutation.mutate(editForm);
   };
 
-  const handleToggleActive = async (templateId: string) => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      setTemplates(prev => prev.map(template => 
-        template.id === templateId 
-          ? { ...template, isActive: !template.isActive, updatedAt: new Date().toISOString() }
-          : template
-      ));
-      
-      const template = templates.find(t => t.id === templateId);
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return await api.emailTemplates.update(id, { isActive });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
       toast({
-        title: template?.isActive ? 'Template deactivated' : 'Template activated',
-        description: `${template?.name} is now ${template?.isActive ? 'inactive' : 'active'}`,
+        title: variables.isActive ? 'Template activated' : 'Template deactivated',
+        description: `Template status updated successfully`,
       });
-    } catch (error) {
+    },
+    onError: () => {
       toast({
         title: 'Error',
         description: 'Failed to update template status',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+  });
+
+  const handleToggleActive = async (template: EmailTemplate) => {
+    toggleActiveMutation.mutate({ id: template.id, isActive: !template.isActive });
   };
 
-  const handleDeleteTemplate = async (templateId: string) => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const template = templates.find(t => t.id === templateId);
-      setTemplates(prev => prev.filter(t => t.id !== templateId));
-      
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await api.emailTemplates.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
       toast({
         title: 'Template deleted',
-        description: `${template?.name} has been removed`,
+        description: 'Template has been removed',
       });
-    } catch (error) {
+    },
+    onError: () => {
       toast({
         title: 'Error',
         description: 'Failed to delete template',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+  });
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    deleteMutation.mutate(templateId);
   };
 
-  const handleDuplicateTemplate = async (template: EmailTemplate) => {
-    setIsLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const newTemplate: EmailTemplate = {
-        ...template,
-        id: String(templates.length + 1),
-        name: `${template.name} (Copy)`,
-        useCount: 0,
-        lastUsed: undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      setTemplates(prev => [...prev, newTemplate]);
-      
+  const duplicateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await api.emailTemplates.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
       toast({
         title: 'Template duplicated',
-        description: `Created a copy of ${template.name}`,
+        description: 'Created a copy of the template',
       });
-    } catch (error) {
+    },
+    onError: () => {
       toast({
         title: 'Error',
         description: 'Failed to duplicate template',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+  });
+
+  const handleDuplicateTemplate = async (template: EmailTemplate) => {
+    const { id, ...templateData } = template;
+    duplicateMutation.mutate({
+      ...templateData,
+      name: `${template.name} (Copy)`,
+      type: `${template.type}_copy_${Date.now()}`,
+    });
   };
 
   const getCategoryBadge = (category: string) => {
@@ -444,13 +291,16 @@ export function EmailTemplatesPage() {
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 <SelectItem value="provider">Provider</SelectItem>
-                <SelectItem value="job">Job</SelectItem>
-                <SelectItem value="user">User</SelectItem>
+                <SelectItem value="customer">Customer</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="system">System</SelectItem>
+                <SelectItem value="job">Job</SelectItem>
+                <SelectItem value="booking">Booking</SelectItem>
+                <SelectItem value="contract">Contract</SelectItem>
               </SelectContent>
             </Select>
             <div className="text-sm text-muted-foreground">
-              {filteredTemplates.length} of {templates.length} templates
+              {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''}
             </div>
           </div>
 
@@ -469,7 +319,13 @@ export function EmailTemplatesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTemplates.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="text-muted-foreground">Loading templates...</div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredTemplates.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="text-muted-foreground">
@@ -501,7 +357,7 @@ export function EmailTemplatesPage() {
                         <div>
                           <div className="font-medium">{template.useCount}</div>
                           <div className="text-sm text-muted-foreground">
-                            {template.lastUsed ? `Last: ${formatDate(template.lastUsed)}` : 'Never used'}
+                            {template.lastUsedAt ? `Last: ${formatDate(template.lastUsedAt)}` : 'Never used'}
                           </div>
                         </div>
                       </TableCell>
@@ -575,37 +431,46 @@ export function EmailTemplatesPage() {
 
       {/* View Template Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Template Preview: {selectedTemplate?.name}</DialogTitle>
             <DialogDescription>
               Preview of the email template content
             </DialogDescription>
           </DialogHeader>
           {selectedTemplate && (
-            <Tabs defaultValue="preview" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="preview">Preview</TabsTrigger>
-                <TabsTrigger value="variables">Variables</TabsTrigger>
-                <TabsTrigger value="stats">Usage Stats</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="preview" className="space-y-4">
+            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+              <Tabs defaultValue="preview" className="flex-1 flex flex-col overflow-hidden min-h-0">
+                <TabsList className="flex-shrink-0">
+                  <TabsTrigger value="preview">Preview</TabsTrigger>
+                  <TabsTrigger value="variables">Variables</TabsTrigger>
+                  <TabsTrigger value="stats">Usage Stats</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="preview" className="flex-1 overflow-y-auto space-y-4 mt-4 min-h-0">
                 <div className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Subject</Label>
                     <div className="p-3 bg-muted rounded-md">{selectedTemplate.subject}</div>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">Content</Label>
-                    <div className="p-4 bg-muted rounded-md whitespace-pre-wrap text-sm">
-                      {selectedTemplate.content}
+                    <Label className="text-sm font-medium">HTML Content</Label>
+                    <div className="p-4 bg-muted rounded-md whitespace-pre-wrap text-sm max-h-96 overflow-auto">
+                      {selectedTemplate.bodyHtml}
                     </div>
                   </div>
+                  {selectedTemplate.bodyText && (
+                    <div>
+                      <Label className="text-sm font-medium">Text Content</Label>
+                      <div className="p-4 bg-muted rounded-md whitespace-pre-wrap text-sm max-h-96 overflow-auto">
+                        {selectedTemplate.bodyText}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               
-              <TabsContent value="variables" className="space-y-4">
+              <TabsContent value="variables" className="flex-1 overflow-y-auto space-y-4 mt-4">
                 <div>
                   <Label className="text-sm font-medium">Available Variables</Label>
                   <div className="flex flex-wrap gap-2 mt-2">
@@ -618,7 +483,7 @@ export function EmailTemplatesPage() {
                 </div>
               </TabsContent>
               
-              <TabsContent value="stats" className="space-y-4">
+              <TabsContent value="stats" className="flex-1 overflow-y-auto space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium">Total Uses</Label>
@@ -627,7 +492,7 @@ export function EmailTemplatesPage() {
                   <div>
                     <Label className="text-sm font-medium">Last Used</Label>
                     <div className="text-sm">
-                      {selectedTemplate.lastUsed ? formatDate(selectedTemplate.lastUsed) : 'Never'}
+                      {selectedTemplate.lastUsedAt ? formatDate(selectedTemplate.lastUsedAt) : 'Never'}
                     </div>
                   </div>
                   <div>
@@ -645,8 +510,9 @@ export function EmailTemplatesPage() {
                 </div>
               </TabsContent>
             </Tabs>
+          </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
               Close
             </Button>
@@ -662,14 +528,14 @@ export function EmailTemplatesPage() {
           setSelectedTemplate(null);
         }
       }}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{selectedTemplate ? 'Edit Template' : 'Create Template'}</DialogTitle>
             <DialogDescription>
               {selectedTemplate ? 'Update template details' : 'Create a new email template'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="template-name">Template Name *</Label>
@@ -683,6 +549,43 @@ export function EmailTemplatesPage() {
               </div>
               
               <div className="space-y-2">
+                <Label htmlFor="template-type">Template Type *</Label>
+                <Select 
+                  value={editForm.type} 
+                  onValueChange={(value) => setEditForm(prev => ({ ...prev, type: value }))}
+                  disabled={!!selectedTemplate}
+                >
+                  <SelectTrigger className={editErrors.type ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Select template type" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="welcome_customer">Welcome Email - Customer</SelectItem>
+                    <SelectItem value="welcome_provider">Welcome Email - Provider</SelectItem>
+                    <SelectItem value="welcome_admin">Welcome Email - Admin</SelectItem>
+                    <SelectItem value="account_created">Account Created Confirmation</SelectItem>
+                    <SelectItem value="password_reset">Password Reset Request</SelectItem>
+                    <SelectItem value="password_reset_success">Password Reset Success</SelectItem>
+                    <SelectItem value="account_deleted">Account Deleted</SelectItem>
+                    <SelectItem value="account_inactive">Account Inactive / Suspended</SelectItem>
+                    <SelectItem value="account_reactivated">Account Reactivated</SelectItem>
+                    <SelectItem value="provider_approved">Provider Approval</SelectItem>
+                    <SelectItem value="provider_rejected">Provider Rejection</SelectItem>
+                    <SelectItem value="job_application_received">Job Application Received</SelectItem>
+                    <SelectItem value="booking_confirmation">Booking Confirmation</SelectItem>
+                    <SelectItem value="system_maintenance">System Maintenance Notification</SelectItem>
+                  </SelectContent>
+                </Select>
+                {editErrors.type && <p className="text-sm text-destructive">{editErrors.type}</p>}
+                {!selectedTemplate && (
+                  <p className="text-xs text-muted-foreground">
+                    Select the template type. Each type must be unique.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="template-category">Category *</Label>
                 <Select value={editForm.category} onValueChange={(value) => setEditForm(prev => ({ ...prev, category: value as EmailTemplate['category'] }))}>
                   <SelectTrigger>
@@ -690,9 +593,12 @@ export function EmailTemplatesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="provider">Provider</SelectItem>
-                    <SelectItem value="job">Job</SelectItem>
-                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="customer">Customer</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="system">System</SelectItem>
+                    <SelectItem value="job">Job</SelectItem>
+                    <SelectItem value="booking">Booking</SelectItem>
+                    <SelectItem value="contract">Contract</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -710,23 +616,44 @@ export function EmailTemplatesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="template-content">Content *</Label>
+              <Label htmlFor="template-bodyHtml">HTML Content *</Label>
               <Textarea
-                id="template-content"
+                id="template-bodyHtml"
                 rows={12}
-                value={editForm.content}
-                onChange={(e) => setEditForm(prev => ({ ...prev, content: e.target.value }))}
-                className={editErrors.content ? 'border-destructive' : ''}
-                placeholder="Enter the email template content. Use {{variableName}} for dynamic content."
+                value={editForm.bodyHtml}
+                onChange={(e) => setEditForm(prev => ({ ...prev, bodyHtml: e.target.value }))}
+                className={editErrors.bodyHtml ? 'border-destructive' : ''}
+                placeholder="Enter the email template HTML content. Use {{variableName}} for dynamic content."
               />
-              {editErrors.content && <p className="text-sm text-destructive">{editErrors.content}</p>}
+              {editErrors.bodyHtml && <p className="text-sm text-destructive">{editErrors.bodyHtml}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="template-bodyText">Text Content (Optional)</Label>
+              <Textarea
+                id="template-bodyText"
+                rows={6}
+                value={editForm.bodyText}
+                onChange={(e) => setEditForm(prev => ({ ...prev, bodyText: e.target.value }))}
+                placeholder="Plain text version of the email (optional)"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="template-description">Description (Optional)</Label>
+              <Input
+                id="template-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Brief description of when this template is used"
+              />
             </div>
 
             <div className="text-xs text-muted-foreground">
               Tip: Use double curly braces for variables like {`{{userName}}`}, {`{{companyName}}`}, etc.
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => {
               setEditDialogOpen(false);
               setCreateDialogOpen(false);
@@ -734,8 +661,8 @@ export function EmailTemplatesPage() {
             }}>
               Cancel
             </Button>
-            <Button onClick={handleSaveTemplate} disabled={isLoading}>
-              {selectedTemplate ? 'Update Template' : 'Create Template'}
+            <Button onClick={handleSaveTemplate} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Saving...' : selectedTemplate ? 'Update Template' : 'Create Template'}
             </Button>
           </DialogFooter>
         </DialogContent>

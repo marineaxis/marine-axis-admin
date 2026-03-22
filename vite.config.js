@@ -6,10 +6,11 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    // Run alongside marine-axis-web (8080): use a different port for local dev
+    port: 8081,
     proxy: {
       "/api": {
-        target: "https://marine-axis-be.onrender.com",
+        target: "http://localhost:3000",
         changeOrigin: true,
         secure: false,
       },

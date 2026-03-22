@@ -173,7 +173,12 @@ export function ProvidersPage() {
   };
 
   const handleEditProvider = (provider: Provider) => {
-    navigate(`/providers/${provider.id}/edit`);
+    const pid = provider.id || (provider as unknown as { _id?: string })._id;
+    if (!pid) {
+      toast({ title: 'Error', description: 'Provider ID is missing', variant: 'destructive' });
+      return;
+    }
+    navigate(`/providers/${pid}/edit`);
   };
 
 

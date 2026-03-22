@@ -143,61 +143,28 @@ export class AuthManager {
   }
 }
 
-// Password validation utilities
+// Password validation (matches backend: min 8 characters only)
+const MIN_PASSWORD_LEN = 8;
+
 export const passwordValidation = {
-  minLength: (password: string, min: number = 8): boolean => {
+  minLength: (password: string, min: number = MIN_PASSWORD_LEN): boolean => {
     return password.length >= min;
   },
 
-  hasUppercase: (password: string): boolean => {
-    return /[A-Z]/.test(password);
-  },
-
-  hasLowercase: (password: string): boolean => {
-    return /[a-z]/.test(password);
-  },
-
-  hasNumber: (password: string): boolean => {
-    return /\d/.test(password);
-  },
-
-  hasSpecialChar: (password: string): boolean => {
-    return /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-  },
-
+  /** Only rule: at least 8 characters (no complexity requirements). */
   isValid: (password: string): boolean => {
-    return (
-      passwordValidation.minLength(password) &&
-      passwordValidation.hasUppercase(password) &&
-      passwordValidation.hasLowercase(password) &&
-      passwordValidation.hasNumber(password) &&
-      passwordValidation.hasSpecialChar(password)
-    );
+    return passwordValidation.minLength(password, MIN_PASSWORD_LEN);
   },
 
   getStrength: (password: string): 'weak' | 'medium' | 'strong' => {
-    let score = 0;
-
-    if (passwordValidation.minLength(password)) score++;
-    if (passwordValidation.hasUppercase(password)) score++;
-    if (passwordValidation.hasLowercase(password)) score++;
-    if (passwordValidation.hasNumber(password)) score++;
-    if (passwordValidation.hasSpecialChar(password)) score++;
-
-    if (score <= 2) return 'weak';
-    if (score <= 4) return 'medium';
-    return 'strong';
+    if (!password) return 'weak';
+    if (password.length >= MIN_PASSWORD_LEN) return 'strong';
+    return 'weak';
   },
 
-  getRequirements: (password: string) => {
-    return {
-      minLength: passwordValidation.minLength(password),
-      hasUppercase: passwordValidation.hasUppercase(password),
-      hasLowercase: passwordValidation.hasLowercase(password),
-      hasNumber: passwordValidation.hasNumber(password),
-      hasSpecialChar: passwordValidation.hasSpecialChar(password),
-    };
-  },
+  getRequirements: (password: string) => ({
+    minLength: passwordValidation.minLength(password, MIN_PASSWORD_LEN),
+  }),
 };
 
 // Input sanitization

@@ -34,11 +34,13 @@ import JobDetailPage from "./pages/JobDetailPage";
 
 // Categories Pages
 import CategoriesPage from "./pages/CategoriesPage";
+// Services Pages
+import ServicesPage from "./pages/ServicesPage";
 
 // Other placeholder pages
 import AdminsPage from "./pages/AdminsPage";
 import CreateAdminPage from "./pages/CreateAdminPage";
-import CustomersPage from "./pages/CustomersPage";
+import ClientsPage from "./pages/ClientsPage";
 import BlogsPage from "./pages/BlogsPage";
 import CreateBlogPage from "./pages/CreateBlogPage";
 import EditBlogPage from "./pages/EditBlogPage";
@@ -122,12 +124,12 @@ const App = () => (
                   }
                 />
                 
-                {/* Customer Management */}
+                {/* Client Management */}
                 <Route
-                  path="customers"
+                  path="clients"
                   element={
                     <ProtectedRoute roles={['superadmin']}>
-                      <CustomersPage />
+                      <ClientsPage />
                     </ProtectedRoute>
                   }
                 />
@@ -145,6 +147,9 @@ const App = () => (
                 
                 {/* Categories */}
                 <Route path="categories" element={<CategoriesPage />} />
+                
+                {/* Services */}
+                <Route path="services" element={<ServicesPage />} />
                 
                 {/* Blogs */}
                 <Route path="blogs" element={<BlogsPage />} />

@@ -23,6 +23,7 @@ import {
   FolderKanban,
   Share2,
   UserCircle,
+  Wrench,
 } from 'lucide-react';
 
 import {
@@ -71,8 +72,8 @@ const navigationItems = [
     ],
   },
   {
-    title: 'Customers',
-    url: ROUTES.CUSTOMERS,
+    title: 'Clients',
+    url: ROUTES.CLIENTS,
     icon: UserCircle,
     roles: ['superadmin'],
   },
@@ -114,6 +115,12 @@ const navigationItems = [
     title: 'Categories',
     url: ROUTES.CATEGORIES,
     icon: Tags, // Assuming Tags is a Lucide icon
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Services',
+    url: ROUTES.SERVICES,
+    icon: Wrench,
     roles: ['superadmin', 'admin'],
   },
   {

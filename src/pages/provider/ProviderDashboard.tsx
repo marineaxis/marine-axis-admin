@@ -51,9 +51,22 @@ export function ProviderDashboard() {
       // Fetch provider dashboard data
       const response = await api.analytics.providerDashboard();
       
-      if (response.success) {
-        setStats(response.data.stats || DEFAULT_STATS);
-        setRecentActivity(response.data.recentActivity || DEFAULT_ACTIVITY);
+      if (response.success && response.data) {
+        // Map backend response to frontend format
+        const dashboardData = response.data as any;
+        setStats({
+          totalListings: dashboardData.totalListings || dashboardData.jobsCount || 0,
+          activeListings: dashboardData.activeListings || dashboardData.activeJobsCount || 0,
+          totalViews: dashboardData.totalViews || dashboardData.profileViews || 0,
+          totalInquiries: dashboardData.totalInquiries || dashboardData.enquiriesCount || 0,
+          averageRating: dashboardData.averageRating || dashboardData.rating || 0,
+          totalReviews: dashboardData.totalReviews || dashboardData.reviewCount || 0,
+        });
+        setRecentActivity(dashboardData.recentActivity || DEFAULT_ACTIVITY);
+      } else {
+        // Use default data if response is not successful
+        setStats(DEFAULT_STATS);
+        setRecentActivity(DEFAULT_ACTIVITY);
       }
     } catch (error: any) {
       console.error('Dashboard data fetch error:', error);
@@ -63,7 +76,7 @@ export function ProviderDashboard() {
       
       toast({
         title: 'Dashboard Error',
-        description: 'Using offline data. Please check your connection.',
+        description: error?.response?.data?.message || 'Using offline data. Please check your connection.',
         variant: 'destructive',
       });
     } finally {

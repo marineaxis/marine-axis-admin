@@ -428,7 +428,7 @@ export function ApprovalsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Approvals</h1>
-          <p className="text-muted-foreground">Review and manage pending approval requests</p>
+          <p className="text-muted-foreground">Review and manage pending approval requests. Includes provider applications from clients who applied via &quot;Apply to Become Provider&quot;.</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-sm text-muted-foreground">

@@ -165,7 +165,6 @@ const CURRENCIES = [
   { code: 'WST', name: 'Samoan Tala' },
   { code: 'TOP', name: 'Tongan Pa\'anga' },
   { code: 'XPF', name: 'CFP Franc' },
-  { code: 'NZD', name: 'New Zealand Dollar' }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 export function CreateJobPage() {

@@ -99,6 +99,30 @@ export interface Category {
   updatedAt: string;
 }
 
+export interface Service {
+  id: string;
+  _id?: string;
+  name: string;
+  slug?: string;
+  description: string;
+  icon: string;
+  features: string[];
+  isActive?: boolean;
+  active?: boolean;
+  order?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateServiceForm {
+  name: string;
+  description: string;
+  icon: string;
+  features: string[];
+  isActive?: boolean;
+  order?: number;
+}
+
 export interface Blog {
   id: string;
   title: string;
@@ -359,4 +383,19 @@ export interface TableColumn<T = any> {
   render?: (value: any, record: T) => React.ReactNode;
   width?: string | number;
   align?: 'left' | 'center' | 'right';
+}
+
+export interface Client {
+  id?: string;
+  _id?: string;
+  name: string;
+  /** Company / legal name when userType is organization */
+  organizationName?: string;
+  email: string;
+  userType?: 'individual' | 'organization';
+  planKey?: string;
+  features?: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

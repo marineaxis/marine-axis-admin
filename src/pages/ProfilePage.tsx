@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { useAuth } from '../context/AuthContext';
 import { passwordValidation } from '../lib/auth';
+import api from '../lib/api';
 
 export function ProfilePage() {
   const { user, updateProfile } = useAuth();
@@ -72,7 +73,7 @@ export function ProfilePage() {
     if (!passwordData.currentPassword) newErrors.currentPassword = 'Current password is required';
     if (!passwordData.newPassword) newErrors.newPassword = 'New password is required';
     else if (!passwordValidation.isValid(passwordData.newPassword)) {
-      newErrors.newPassword = 'Password must meet security requirements';
+      newErrors.newPassword = 'Password must be at least 8 characters';
     }
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
@@ -271,33 +272,10 @@ export function ProfilePage() {
                       </Button>
                     </div>
                     
-                    {/* Password Requirements */}
                     {passwordData.newPassword && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Password requirements:</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className={`flex items-center gap-1 ${passwordRequirements.minLength ? 'text-green-600' : 'text-muted-foreground'}`}>
-                            <div className={`w-1 h-1 rounded-full ${passwordRequirements.minLength ? 'bg-green-600' : 'bg-muted-foreground'}`} />
-                            8+ characters
-                          </div>
-                          <div className={`flex items-center gap-1 ${passwordRequirements.hasUppercase ? 'text-green-600' : 'text-muted-foreground'}`}>
-                            <div className={`w-1 h-1 rounded-full ${passwordRequirements.hasUppercase ? 'bg-green-600' : 'bg-muted-foreground'}`} />
-                            Uppercase letter
-                          </div>
-                          <div className={`flex items-center gap-1 ${passwordRequirements.hasLowercase ? 'text-green-600' : 'text-muted-foreground'}`}>
-                            <div className={`w-1 h-1 rounded-full ${passwordRequirements.hasLowercase ? 'bg-green-600' : 'bg-muted-foreground'}`} />
-                            Lowercase letter
-                          </div>
-                          <div className={`flex items-center gap-1 ${passwordRequirements.hasNumber ? 'text-green-600' : 'text-muted-foreground'}`}>
-                            <div className={`w-1 h-1 rounded-full ${passwordRequirements.hasNumber ? 'bg-green-600' : 'bg-muted-foreground'}`} />
-                            Number
-                          </div>
-                          <div className={`flex items-center gap-1 ${passwordRequirements.hasSpecialChar ? 'text-green-600' : 'text-muted-foreground'}`}>
-                            <div className={`w-1 h-1 rounded-full ${passwordRequirements.hasSpecialChar ? 'bg-green-600' : 'bg-muted-foreground'}`} />
-                            Special character
-                          </div>
-                        </div>
-                      </div>
+                      <p className={`text-xs ${passwordRequirements.minLength ? 'text-green-600' : 'text-muted-foreground'}`}>
+                        At least 8 characters
+                      </p>
                     )}
                     
                     {errors.newPassword && <p className="text-sm text-destructive">{errors.newPassword}</p>}

@@ -497,88 +497,12 @@ export function ProviderForm({ initialData, mode, onSubmit, onCancel, loading = 
   };
 
   const handleAddDocumentItem = async () => {
-    toast({ 
-      title: 'Coming Soon', 
-      description: 'Document upload functionality will be available soon.', 
-      variant: 'default' 
+    toast({
+      title: 'Coming Soon',
+      description: 'Document upload functionality will be available soon.',
+      variant: 'default',
     });
-    return;
-    
-    setUploadingDocument(true);
-    try {
-      const providerId = initialData?.id || initialData?._id || 'new';
-      
-      // For new providers, we'll need to create the provider first or use a temporary ID
-      if (providerId === 'new') {
-        toast({ 
-          title: 'Info', 
-          description: 'Please save the provider first, then you can upload documents.', 
-          variant: 'default' 
-        });
-        setUploadingDocument(false);
-        return;
-      }
-      
-      // Step 1: Get presigned upload URL
-      const uploadUrlResponse = await api.providers.generateUploadUrl(
-        providerId,
-        currentDocumentFile.name,
-        currentDocumentFile.type,
-        'document'
-      );
-      
-      if (!uploadUrlResponse.success || !uploadUrlResponse.data?.uploadUrl) {
-        throw new Error(uploadUrlResponse.message || 'Failed to get upload URL.');
-      }
-      
-      const { uploadUrl, key } = uploadUrlResponse.data;
-      
-      // Step 2: Upload file directly to upload URL
-      // For Cloudinary, we need to send file name and folder in headers
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: currentDocumentFile,
-        headers: {
-          'Content-Type': currentDocumentFile.type,
-          'X-File-Name': currentDocumentFile.name,
-          'X-Folder': `providers/${providerId}/documents`,
-        },
-      });
-      
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Failed to upload file: ${errorText}`);
-      }
-      
-      // Step 3: Get the response with the actual URL
-      const uploadResult = await uploadResponse.json();
-      const fileUrl = uploadResult.data?.url || uploadResult.data?.downloadUrl;
-      
-      if (!fileUrl) {
-        throw new Error('Upload succeeded but no URL returned');
-      }
-      
-      const newDocumentItem = {
-        name: currentDocumentFile.name,
-        type: currentDocumentType,
-        url: fileUrl, // Use the actual Cloudinary URL
-        key: uploadResult.data?.key || key || currentDocumentFile.name,
-        uploadedAt: new Date().toISOString(),
-      };
-      
-      setFormData(prev => ({
-        ...prev,
-        documents: [...(prev.documents || []), newDocumentItem],
-      }));
-      setCurrentDocumentFile(null);
-      setCurrentDocumentType('Other');
-      toast({ title: 'Success', description: 'Document uploaded successfully.' });
-    } catch (error: any) {
-      console.error('Document upload error:', error);
-      toast({ title: 'Error', description: error.message || 'Failed to upload document.', variant: 'destructive' });
-    } finally {
-      setUploadingDocument(false);
-    }
+    // When implementing: use generateUploadUrl + PUT to uploadUrl (see gallery upload pattern).
   };
 
   const handleRemoveDocumentItem = (key: string) => {
@@ -619,21 +543,27 @@ export function ProviderForm({ initialData, mode, onSubmit, onCancel, loading = 
       });
     }
 
+    const rawCoords = formData.coordinates || [0, 0];
+    const coords: [number, number] = [
+      Number(rawCoords[0]),
+      Number(rawCoords[1]),
+    ];
+
     const submitData: any = {
       email: sanitize.email(formData.email),
       phone: sanitize.phone(formData.phone),
       companyName: formData.companyName.trim(),
       contactName: formData.contactName?.trim() || formData.companyName.trim(),
-      description: formData.description?.trim(),
       address: {
         street: formData.address?.street?.trim() || '',
         city: formData.address?.city?.trim() || '',
         state: formData.address?.state?.trim() || '',
         country: formData.address?.country?.trim() || '',
       },
+      // Backend expects { coordinates: [lng, lat] }; omit empty description (Zod rejects "")
+      ...(formData.description?.trim() ? { description: formData.description.trim() } : {}),
       location: {
-        type: 'Point',
-        coordinates: formData.coordinates || [0, 0],
+        coordinates: coords,
       },
       services: formData.services || [],
       categories: formData.categoryIds || [], // Backend expects 'categories' not 'categoryIds'

@@ -3,27 +3,14 @@ import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import { API_BASE_URL, LOCAL_STORAGE_KEYS, ERROR_MESSAGES } from './constants';
 import { ApiResponse, PaginatedResponse } from '../types';
 
-// Mock Auth Service for token refresh
-class MockAuthService {
-  static async refreshToken() {
-    // This will be replaced with actual refresh endpoint
-    return {
-      success: true,
-      data: {
-        accessToken: localStorage.getItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN) || '',
-        refreshToken: localStorage.getItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN) || '',
-      },
-    };
-  }
-}
-
 class ApiClient {
   private instance: AxiosInstance;
 
   constructor() {
     this.instance = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 30000,
+      /** Longer timeout for provider uploads / large payloads */
+      timeout: 120000,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -50,28 +37,43 @@ class ApiClient {
       (response: AxiosResponse) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as any;
+        const reqUrl = String(originalRequest?.url || '');
 
         if (error.response?.status === 401 && !originalRequest._retry) {
+          // Don't try to refresh on login/signup failures
+          if (reqUrl.includes('/auth/login') || reqUrl.includes('/auth/signup')) {
+            return Promise.reject(this.handleError(error));
+          }
+
           originalRequest._retry = true;
 
           try {
             const refreshToken = localStorage.getItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN);
-            if (refreshToken) {
-              const response = await MockAuthService.refreshToken();
-
-              if (response.success) {
-                const { accessToken, refreshToken } = response.data;
-                localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN, accessToken);
-                if (refreshToken) {
-                  localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
-                }
-
-                originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-                return this.instance(originalRequest);
-              } else {
-                throw new Error('Token refresh failed');
-              }
+            if (!refreshToken) {
+              this.clearAuth();
+              window.location.href = '/login';
+              return Promise.reject(error);
             }
+
+            // Use plain axios so we don't recurse through interceptors; backend rotates refresh token
+            const refreshRes = await axios.post<{ success?: boolean; data?: { accessToken?: string; refreshToken?: string } }>(
+              `${API_BASE_URL}/auth/refresh`,
+              { refreshToken },
+              { headers: { 'Content-Type': 'application/json' }, timeout: 20000 }
+            );
+            const payload = refreshRes.data?.data;
+            const accessToken = payload?.accessToken;
+            const newRefresh = payload?.refreshToken;
+            if (!accessToken) {
+              throw new Error('Token refresh failed: no access token');
+            }
+            localStorage.setItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN, accessToken);
+            if (newRefresh) {
+              localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, newRefresh);
+            }
+
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            return this.instance(originalRequest);
           } catch (refreshError) {
             this.clearAuth();
             window.location.href = '/login';
@@ -293,6 +295,11 @@ class ApiClient {
       return this.get(`/providers/${id}`);
     },
 
+    // GET /api/v1/providers/me - Get current provider's own data (self-service)
+    getMe: async () => {
+      return this.get('/providers/me');
+    },
+
     create: async (data: any) => {
       return this.post('/providers', data);
     },
@@ -437,6 +444,33 @@ class ApiClient {
     },
   };
 
+  // Service management (Marine Axis services)
+  services = {
+    list: async (params?: any) => {
+      return this.get('/services', params);
+    },
+
+    get: async (id: string) => {
+      return this.get(`/services/${id}`);
+    },
+
+    create: async (data: any) => {
+      return this.post('/services', data);
+    },
+
+    update: async (id: string, data: any) => {
+      return this.put(`/services/${id}`, data);
+    },
+
+    delete: async (id: string) => {
+      return this.delete(`/services/${id}`);
+    },
+
+    getStats: async () => {
+      return this.get('/services/stats/summary');
+    },
+  };
+
   // Blog management
   blogs = {
     list: async (params?: any) => {
@@ -546,26 +580,27 @@ class ApiClient {
     list: async (params?: any) => {
       return this.get('/email-templates', params);
     },
-
+    getStats: async () => {
+      return this.get('/email-templates/stats');
+    },
+    getByType: async (type: string) => {
+      return this.get(`/email-templates/type/${type}`);
+    },
     get: async (id: string) => {
       return this.get(`/email-templates/${id}`);
     },
-
     create: async (data: any) => {
       return this.post('/email-templates', data);
     },
-
     update: async (id: string, data: any) => {
       return this.put(`/email-templates/${id}`, data);
     },
-
     delete: async (id: string) => {
       return this.delete(`/email-templates/${id}`);
     },
-
     // POST /api/v1/email-templates/send-test - Send test email
     // Body: { templateId, to, data? }
-    test: async (templateId: string, to: string, data?: any) => {
+    sendTest: async (templateId: string, to: string, data?: any) => {
       return this.post('/email-templates/send-test', { templateId, to, data });
     },
   };
@@ -662,29 +697,24 @@ class ApiClient {
     },
   };
 
-  // Customer management - Superadmin only
-  // GET /api/v1/customers - Get all customers with filters and pagination
+  // Client management - Superadmin only
+  // GET /api/v1/clients - Get all clients with filters and pagination
   // Query params: page, limit, isActive, search
-  customers = {
-    // GET /api/v1/customers - List all customers with pagination and filters (Superadmin only)
+  clients = {
     list: async (params?: any) => {
-      return this.getPaginated('/customers', params);
+      return this.getPaginated('/clients', params);
     },
 
-    // GET /api/v1/customers/:id - Get single customer by ID (Superadmin only)
     get: async (id: string) => {
-      return this.get(`/customers/${id}`);
+      return this.get(`/clients/${id}`);
     },
 
-    // PUT /api/v1/customers/:id - Update customer (Superadmin only)
-    // Body: { name?, isActive?, planKey? }
     update: async (id: string, data: any) => {
-      return this.put(`/customers/${id}`, data);
+      return this.put(`/clients/${id}`, data);
     },
 
-    // GET /api/v1/customers/stats - Get customer statistics (Superadmin only)
     getStats: async () => {
-      return this.get('/customers/stats');
+      return this.get('/clients/stats');
     },
   };
 

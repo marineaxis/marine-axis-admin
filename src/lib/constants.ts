@@ -38,8 +38,8 @@ export const ROUTES = {
   ADMIN_CREATE: '/admins/create',
   ADMIN_EDIT: '/admins/:id/edit',
   
-  // Customer Management
-  CUSTOMERS: '/customers',
+  // Client Management
+  CLIENTS: '/clients',
   
   // Provider Management
   PROVIDERS: '/providers',
@@ -57,6 +57,11 @@ export const ROUTES = {
   CATEGORIES: '/categories',
   CATEGORY_CREATE: '/categories/create',
   CATEGORY_EDIT: '/categories/:id/edit',
+  
+  // Service Management (Marine Axis Services)
+  SERVICES: '/services',
+  SERVICE_CREATE: '/services/create',
+  SERVICE_EDIT: '/services/:id/edit',
   
   // Blog Management
   BLOGS: '/blogs',
