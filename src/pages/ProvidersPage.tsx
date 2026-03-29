@@ -51,7 +51,8 @@ export function ProvidersPage() {
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  /** Default to approved so the directory matches the public site; use Pending / All to review applications. */
+  const [statusFilter, setStatusFilter] = useState<string>('approved');
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
 
@@ -224,7 +225,7 @@ export function ProvidersPage() {
         <CardHeader>
           <CardTitle>Provider Management</CardTitle>
           <CardDescription>
-            View and manage all service providers
+            Approved providers listed here match what the public sees. Filter by Pending or All to review applications.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -243,9 +244,9 @@ export function ProvidersPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved (public directory)</SelectItem>
+                <SelectItem value="pending">Pending applications</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="suspended">Suspended</SelectItem>
               </SelectContent>
@@ -274,7 +275,9 @@ export function ProvidersPage() {
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="text-muted-foreground">
-                        {searchQuery || statusFilter !== 'all' ? 'No providers found matching your criteria' : 'No providers found'}
+                        {searchQuery.trim() || statusFilter !== 'approved'
+                          ? 'No providers found matching your criteria'
+                          : 'No approved providers in the directory yet'}
                       </div>
                     </TableCell>
                   </TableRow>

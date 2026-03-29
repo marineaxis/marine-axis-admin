@@ -187,10 +187,13 @@ export const sanitize = {
     return input.replace(/[^\d\+\-\(\)\s]/g, '');
   },
 
+  /** Normalize to absolute URL; host-only values need a scheme or `new URL` fails and nothing gets saved. */
   url: (input: string): string => {
+    const t = input.trim();
+    if (!t) return '';
     try {
-      const url = new URL(input);
-      return url.toString();
+      const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+      return new URL(withScheme).toString();
     } catch {
       return '';
     }

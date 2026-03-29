@@ -1,5 +1,5 @@
 // Sidebar component for Marine-Axis Admin Panel
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -47,6 +47,8 @@ import {
 } from '@/components/ui/collapsible';
 import { useAuth } from '../../context/AuthContext';
 import { ROUTES } from '../../lib/constants';
+import api from '../../lib/api';
+import { cn } from '@/lib/utils';
 
 const navigationItems = [
   {
@@ -232,8 +234,40 @@ const navigationItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { canAccess, hasRole, isLoading: authLoading, user } = useAuth();
+  const { hasRole, isLoading: authLoading, user } = useAuth();
   const location = useLocation();
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  const canFetchApprovalsStats =
+    !authLoading && user && (user.role === 'admin' || user.role === 'superadmin');
+
+  const refreshPendingApprovalsCount = useCallback(async () => {
+    if (!canFetchApprovalsStats) return;
+    try {
+      const res = await api.approvals.getStats();
+      if (res.success && res.data && typeof (res.data as { pending?: number }).pending === 'number') {
+        setPendingApprovalsCount((res.data as { pending: number }).pending);
+      }
+    } catch {
+      /* ignore — sidebar should not break on stats failure */
+    }
+  }, [canFetchApprovalsStats]);
+
+  useEffect(() => {
+    refreshPendingApprovalsCount();
+  }, [refreshPendingApprovalsCount]);
+
+  useEffect(() => {
+    if (!canFetchApprovalsStats) return;
+    const t = window.setInterval(refreshPendingApprovalsCount, 120_000);
+    return () => window.clearInterval(t);
+  }, [canFetchApprovalsStats, refreshPendingApprovalsCount]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith(ROUTES.APPROVALS)) {
+      refreshPendingApprovalsCount();
+    }
+  }, [location.pathname, refreshPendingApprovalsCount]);
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -349,12 +383,25 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
-                      <NavLink 
-                        to={item.url} 
-                        className={({ isActive }) => getNavClassName(isActive)}
+                      <NavLink
+                        to={item.url}
+                        className={({ isActive }) =>
+                          cn(getNavClassName(isActive), 'relative', item.url === ROUTES.APPROVALS && 'pr-1')
+                        }
                       >
-                          {item.icon && <item.icon className="mr-2 h-4 w-4" />}
-                        {!collapsed && <span>{item.title}</span>}
+                        {item.icon && <item.icon className="mr-2 h-4 w-4 shrink-0" />}
+                        {!collapsed && <span className="flex-1 truncate">{item.title}</span>}
+                        {item.url === ROUTES.APPROVALS && pendingApprovalsCount > 0 && (
+                          <span
+                            className={cn(
+                              'size-2 shrink-0 rounded-full bg-amber-500 shadow-sm',
+                              collapsed && 'absolute right-1.5 top-1.5 ring-2 ring-sidebar',
+                              !collapsed && 'ml-1',
+                            )}
+                            title={`${pendingApprovalsCount} pending approval${pendingApprovalsCount === 1 ? '' : 's'}`}
+                            aria-label={`${pendingApprovalsCount} pending approvals need attention`}
+                          />
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

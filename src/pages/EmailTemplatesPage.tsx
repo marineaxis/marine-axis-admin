@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Send, Copy, Download } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Send, Copy, Download, Info } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import api from '../lib/api';
 
@@ -264,6 +265,22 @@ export function EmailTemplatesPage() {
           Create Template
         </Button>
       </div>
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Registration and system template types</AlertTitle>
+        <AlertDescription className="text-sm space-y-2">
+          <p>
+            Signup flows use these <code className="text-xs bg-muted px-1 rounded">type</code> values (do not rename the type key unless you update the backend):{' '}
+            <strong>welcome_customer</strong>, <strong>welcome_provider</strong>, <strong>admin_notify_new_client</strong>,{' '}
+            <strong>admin_notify_new_provider</strong>.
+          </p>
+          <p className="text-muted-foreground">
+            Admin notifications go to <code className="text-xs bg-muted px-1 rounded">CONTACT_NOTIFICATION_EMAIL</code> on the API (default info@marineaxis.in).
+            New templates from seed: run the email-templates seed endpoint or create the types manually if your database was created before these were added.
+          </p>
+        </AlertDescription>
+      </Alert>
 
       {/* Filters */}
       <Card>
