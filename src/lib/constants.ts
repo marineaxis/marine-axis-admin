@@ -63,7 +63,20 @@ export const ROUTES = {
   SERVICE_CREATE: '/services/create',
   SERVICE_EDIT: '/services/:id/edit',
   
-  // Blog Management
+  // Education Management
+  EDUCATION: '/education',
+  COURSES: '/education/courses',
+  COURSE_CREATE: '/education/courses/create',
+  COURSE_EDIT: '/education/courses/:id/edit',
+  COURSE_DETAIL: '/education/courses/:id',
+  COLLEGES: '/education/colleges',
+  COLLEGE_CREATE: '/education/colleges/create',
+  COLLEGE_EDIT: '/education/colleges/:id/edit',
+  BLOG_MANAGEMENT: '/education/blogs',
+  BLOG_CREATE_EDU: '/education/blogs/create',
+  BLOG_EDIT_EDU: '/education/blogs/:id/edit',
+
+  // Blog Management (Legacy)
   BLOGS: '/blogs',
   BLOG_CREATE: '/blogs/create',
   BLOG_EDIT: '/blogs/:id/edit',

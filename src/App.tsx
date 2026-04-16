@@ -45,6 +45,9 @@ import BlogsPage from "./pages/BlogsPage";
 import CreateBlogPage from "./pages/CreateBlogPage";
 import EditBlogPage from "./pages/EditBlogPage";
 import BlogDetailPage from "./pages/BlogDetailPage";
+import CoursesPage from "./pages/CoursesPage";
+import CreateCoursePage from "./pages/CreateCoursePage";
+import EditCoursePage from "./pages/EditCoursePage";
 
 // Provider Pages
 import ProviderDashboard from "./pages/provider/ProviderDashboard";
@@ -150,6 +153,15 @@ const App = () => (
                 
                 {/* Services */}
                 <Route path="services" element={<ServicesPage />} />
+                
+                {/* Education - Courses */}
+                <Route path="education/courses" element={<CoursesPage />} />
+                <Route path="education/courses/create" element={<CreateCoursePage />} />
+                <Route path="education/courses/:id" element={<CoursesPage />} />
+                <Route path="education/courses/:id/edit" element={<EditCoursePage />} />
+                
+                {/* Education - Blogs (redirect to main blogs) */}
+                <Route path="education/blogs" element={<BlogsPage />} />
                 
                 {/* Blogs */}
                 <Route path="blogs" element={<BlogsPage />} />

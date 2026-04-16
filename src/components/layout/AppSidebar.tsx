@@ -13,17 +13,17 @@ import {
   Settings,
   BarChart3,
   Shield,
-  Waves,
+  Ship,
   ChevronDown,
   User,
   MessageSquare,
   Calendar,
   FileCheck,
-  Ship,
   FolderKanban,
   Share2,
   UserCircle,
   Wrench,
+  BookOpen,
 } from 'lucide-react';
 
 import {
@@ -124,6 +124,23 @@ const navigationItems = [
     url: ROUTES.SERVICES,
     icon: Wrench,
     roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Courses',
+    icon: BookOpen,
+    roles: ['superadmin', 'admin'],
+    children: [
+      {
+        title: 'All Courses',
+        url: ROUTES.COURSES,
+        icon: BookOpen,
+      },
+      {
+        title: 'Create Course',
+        url: ROUTES.COURSE_CREATE,
+        icon: User,
+      },
+    ],
   },
   {
     title: 'Blog Management',
@@ -317,7 +334,7 @@ export function AppSidebar() {
           <div className="flex items-center px-4 py-6">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Waves className="w-5 h-5 text-white" />
+                <Ship className="w-5 h-5 text-white" />
               </div>
               {!collapsed && (
                 <div>
