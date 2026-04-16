@@ -19,7 +19,6 @@ import {
   MessageSquare,
   Calendar,
   FileCheck,
-  Ship,
   FolderKanban,
   Share2,
   UserCircle,
