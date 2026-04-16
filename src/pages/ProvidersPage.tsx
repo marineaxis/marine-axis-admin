@@ -100,7 +100,32 @@ export function ProvidersPage() {
   }, [searchQuery, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter providers (ensure it's always an array)
-  const filteredProviders = Array.isArray(providers) ? providers : [];
+  const filteredProviders = React.useMemo(() => {
+    if (!Array.isArray(providers)) return [];
+    
+    return providers.filter((provider) => {
+      // Status filter
+      if (statusFilter !== 'all' && provider.status !== statusFilter) {
+        return false;
+      }
+      
+      // Search filter
+      if (searchQuery.trim()) {
+        const search = searchQuery.toLowerCase();
+        const name = (provider.name || provider.companyName || '').toLowerCase();
+        const email = (provider.email || '').toLowerCase();
+        const phone = (provider.phone || '').toLowerCase();
+        
+        return (
+          name.includes(search) ||
+          email.includes(search) ||
+          phone.includes(search)
+        );
+      }
+      
+      return true;
+    });
+  }, [providers, statusFilter, searchQuery]);
 
   const handleApprove = async (providerId: string) => {
     try {
@@ -288,7 +313,7 @@ export function ProvidersPage() {
                         <div className="flex items-center gap-2">
                           <div>
                             <div className="font-medium flex items-center gap-1">
-                              {provider.name}
+                              {provider.name || provider.companyName}
                               {provider.featured && <Star className="h-3 w-3 text-yellow-500 fill-current" />}
                             </div>
                             <div className="text-sm text-muted-foreground">
@@ -366,7 +391,7 @@ export function ProvidersPage() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete Provider</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure you want to delete <strong>{provider.name}</strong>? 
+                                    Are you sure you want to delete <strong>{provider.name || provider.companyName}</strong>? 
                                     This action cannot be undone.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
@@ -409,7 +434,7 @@ export function ProvidersPage() {
                 <div>
                   <h4 className="font-semibold mb-2">Basic Information</h4>
                   <div className="space-y-2 text-sm">
-                    <div><span className="font-medium">Name:</span> {selectedProvider.name}</div>
+                    <div><span className="font-medium">Name:</span> {selectedProvider.name || selectedProvider.companyName}</div>
                     <div><span className="font-medium">Email:</span> {selectedProvider.email}</div>
                     <div><span className="font-medium">Phone:</span> {selectedProvider.phone}</div>
                     <div><span className="font-medium">Location:</span> {formatLocation(selectedProvider)}</div>

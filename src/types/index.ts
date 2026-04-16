@@ -148,6 +148,41 @@ export interface Blog {
   updatedAt: string;
 }
 
+export interface Course {
+  _id: string;
+  title: string;
+  slug: string;
+  code: string;
+  description: string;
+  category: string;
+  level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  duration: {
+    value: number;
+    unit: 'weeks' | 'months' | 'years';
+  };
+  price: {
+    amount: number;
+    currency: string;
+    priceType: 'free' | 'paid' | 'subscription';
+  };
+  instructor?: {
+    name: string;
+    email?: string;
+    bio?: string;
+    photo?: string;
+    credentials?: string;
+  };
+  learningOutcomes: string[];
+  requirements: string[];
+  featured: boolean;
+  status: 'draft' | 'published' | 'archived' | 'active' | 'inactive';
+  enrollmentCount: number;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Approval {
   id: string;
   type: 'provider_registration' | 'provider_edit' | 'job_posting' | 'blog_post';

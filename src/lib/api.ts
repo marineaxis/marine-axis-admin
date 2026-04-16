@@ -471,6 +471,53 @@ class ApiClient {
     },
   };
 
+  // Course management
+  courses = {
+    list: async (params?: any) => {
+      return this.getPaginated('/courses', params);
+    },
+
+    get: async (id: string) => {
+      return this.get(`/courses/${id}`);
+    },
+
+    create: async (data: any) => {
+      return this.post('/courses', data);
+    },
+
+    update: async (id: string, data: any) => {
+      return this.put(`/courses/${id}`, data);
+    },
+
+    delete: async (id: string) => {
+      return this.delete(`/courses/${id}`);
+    },
+
+    getStats: async () => {
+      return this.get('/courses/stats');
+    },
+
+    getFeatured: async (params?: any) => {
+      return this.get('/courses/featured', params);
+    },
+
+    getBySlug: async (slug: string) => {
+      return this.get(`/courses/slug/${slug}`);
+    },
+
+    getByCategory: async (category: string, params?: any) => {
+      return this.get(`/courses/category/${category}`, params);
+    },
+
+    getByLevel: async (level: string, params?: any) => {
+      return this.get(`/courses/level/${level}`, params);
+    },
+
+    search: async (params?: any) => {
+      return this.getPaginated('/courses/search', params);
+    },
+  };
+
   // Blog management
   blogs = {
     list: async (params?: any) => {
